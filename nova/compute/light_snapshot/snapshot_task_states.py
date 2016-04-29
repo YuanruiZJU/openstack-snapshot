@@ -24,7 +24,8 @@ VM_SNAPSHOT_PENDING = "light_snapshot_pending"
 VM_SNAPSHOT = "light_snapshot"
 VM_SNAPSHOT_COMMIT = "commit_last_snapshot"
 
-VM_COMMIT = "commit_snapshot"
+VM_COMMIT_START = "commit_start"
+VM_COMMITING = "committing"
 
 VM_DELETE_SNAPSHOT = "vm_delete_snapshot"
 
