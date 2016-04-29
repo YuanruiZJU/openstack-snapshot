@@ -20,8 +20,13 @@
 
 # added by Yuanrui Fan. To Use the snapshot function of libvirt in new version
 # we add snapshot function for openstack. Here is the task states for this function
-VM_SNAPSHOT_PENDING = "vm_snapshot_pending"
-VM_SNAPSHOT = "vm_snapshot"
-VM_COMMIT = "vm_commit_second_disk"
+VM_SNAPSHOT_PENDING = "light_snapshot_pending"
+VM_SNAPSHOT = "light_snapshot"
+VM_SNAPSHOT_COMMIT = "commit_last_snapshot"
+
+VM_COMMIT = "commit_snapshot"
+
 VM_DELETE_SNAPSHOT = "vm_delete_snapshot"
-VM_RECOVER_FROM_SNAPSHOT = "vm_recover_snapshot"
+
+VM_RECOVER_FROM_SNAPSHOT = "recovering"
+VM_RECOVER_START = "recover_start"
