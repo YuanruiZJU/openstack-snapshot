@@ -1784,19 +1784,24 @@ def do_set_password(cs, args):
 # for the instance.
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
 def do_light_snapshot(cs, args):
-    pass
+    """Create snapshot for a running server"""
+    server = _find_server(cs, args.server)
+    cs.servers.light_snapshot(server)  
 
 # Added by YuanruiFan. Add a command line for recover the instance
 # from its snapshot.
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
 def do_recover(cs, args):
-    pass
+    """Recover the instance from its snapshot"""
+    server = _find_server(cs, args.server)
+    cs.servers.light_recover(server)
 
 # Added by YuanruiFan. Add a command line for commit the snapshot
 # of the instance.
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
 def do_commit_snapshot(cs, args):
-    pass
+    server = _find_server(cs, args.server)
+    cs.servers.light_commit(server)
 
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
 @cliutils.arg('name', metavar='<name>', help=_('Name of snapshot.'))
