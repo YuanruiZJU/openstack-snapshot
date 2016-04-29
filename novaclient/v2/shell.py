@@ -1780,6 +1780,24 @@ def do_set_password(cs, args):
         raise exceptions.CommandError(_("Passwords do not match."))
     server.change_password(p1)
 
+# Added by YuanruiFan. Add a command line for taking light snapshot
+# for the instance.
+@cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
+def do_light_snapshot(cs, args):
+    pass
+
+# Added by YuanruiFan. Add a command line for recover the instance
+# from its snapshot.
+@cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
+def do_recover(cs, args):
+    pass
+
+# Added by YuanruiFan. Add a command line for commit the snapshot
+# of the instance.
+@cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
+def do_commit_snapshot(cs, args):
+    pass
+
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
 @cliutils.arg('name', metavar='<name>', help=_('Name of snapshot.'))
 @cliutils.arg(
