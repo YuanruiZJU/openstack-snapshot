@@ -2238,6 +2238,7 @@ class API(base.Base):
     # We do not check instance lock for snapshot because lock is 
     # intended to prevent accident change/delete of instances.
     @wrap_check_policy
+    @check_instance_host
     @check_instance_cell
     @check_instance_state(vm_state=[vm_states.ACTIVE])
     def light_snapshot(self, context, instance):
@@ -2256,6 +2257,7 @@ class API(base.Base):
     # We do not check instance lock for snapshot because lock is
     # intended to prevent accident change/delete of instances.
     @wrap_check_policy
+    @check_instance_host
     @check_instance_cell
     @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.STOPPED,
                                     vm_states.PAUSED, vm_states.SUSPENDED])
@@ -2265,7 +2267,7 @@ class API(base.Base):
         :param instance: nova.objects.instance.Instance object
         """
 
-        instance.task_state = snapshot_task_states.VM_RECOVER_FROM_SNAPSHOT
+        instance.task_state = snapshot_task_states.VM_RECOVER_START
         instance.save(expected_task_state=[None])
 
         self.compute_rpcapi.recover_instance(context, instance)
@@ -2275,6 +2277,7 @@ class API(base.Base):
     # We do not check instance lock for snapshot because lock is
     # intended to prevent accident change/delete of instances.
     @wrap_check_policy
+    @check_instance_host
     @check_instance_cell
     @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.STOPPED,
                                     vm_states.PAUSED, vm_states.SUSPENDED])
@@ -2284,7 +2287,7 @@ class API(base.Base):
         :param instance: nova.objects.instance.Instance object
         """
 
-        instance.task_state = snapshot_task_states.VM_COMMIT
+        instance.task_state = snapshot_task_states.VM_COMMIT_START
         instance.save(expected_task_state=[None])
 
         self.compute_rpcapi.light_commit_snapshot(context, instance)    
