@@ -1800,6 +1800,7 @@ def do_recover(cs, args):
 # of the instance.
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
 def do_commit_snapshot(cs, args):
+    """Commit the snapshot of the instance."""
     server = _find_server(cs, args.server)
     cs.servers.light_commit(server)
 
