@@ -1069,6 +1069,8 @@ class ServersController(wsgi.Controller):
         except exception.InstanceInvalidState as state_error:
             common.raise_http_conflict_for_instance_invalid_state(state_error,
                 'create external snapshot', id)
+        except exception.Invalid as err:
+            raise exc.HTTPBadRequest(explanation=err.format_message())
 
 
     # Added by YuanruiFan. To make the instance recover from the 
@@ -1077,14 +1079,45 @@ class ServersController(wsgi.Controller):
     @extensions.expected_errors((400, 403, 404, 409))
     @wsgi.action('recoverInstance')
     def _light_recover_instance(self, req, id, body):
-        pass
+        """ recover the instance from its snapshot"""
+        context = req.environ['nova.context']
+        instance = self._get_instance(context, id)
+        authorize(context, instance, 'recover_instance')
+        LOG.debug('recover the instance from its snapshot', instance=instance)
+        try:
+            self.compute_api.light_recover(context, instance)
+        except exception.InstanceNotReady as e:
+            raise webob.exc.HTTPConflict(explanation=e.format_message())
+        except exception.InstanceUnknownCell as e:
+            raise exc.HTTPNotFound(explanation=e.format_message())
+        except exception.InstanceInvalidState as state_error:
+            common.raise_http_conflict_for_instance_invalid_state(state_error,
+                'recover the instance from its snapshot', id)
+        except exception.Invalid as err:
+            raise exc.HTTPBadRequest(explanation=err.format_message())
+ 
 
     # Added by YuanruiFan. To commit the snapshot to the root disk
     @wsgi.response(202)
     @extensions.expected_errors((400, 403, 404, 409))
     @wsgi.action('commitSnapshot')
     def _light_commit_snapshot(self, req, id, body):
-        pass
+        """ recover the instance from its snapshot"""
+        context = req.environ['nova.context']
+        instance = self._get_instance(context, id)
+        authorize(context, instance, 'commit_snapshot')
+        LOG.debug('commit the snapshot of the instance', instance=instance)
+        try:
+            self.compute_api.commit_snapshot(context, instance)
+        except exception.InstanceNotReady as e:
+            raise webob.exc.HTTPConflict(explanation=e.format_message())
+        except exception.InstanceUnknownCell as e:
+            raise exc.HTTPNotFound(explanation=e.format_message())
+        except exception.InstanceInvalidState as state_error:
+            common.raise_http_conflict_for_instance_invalid_state(state_error,
+                'commit snapshot', id)
+        except exception.Invalid as err:
+            raise exc.HTTPBadRequest(explanation=err.format_message())
 
     @wsgi.response(202)
     @extensions.expected_errors((400, 403, 404, 409))
