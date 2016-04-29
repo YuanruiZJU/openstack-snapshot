@@ -1090,6 +1090,8 @@ class ServerManager(base.BootingManagerWithFind):
         image_uuid = location.split('/')[-1]
         return image_uuid
 
+    # Added by YuanruiFan. To create a external snapshot system.
+    # Add some functions for our light snapshot system
     def light_snapshot(self, server, metadata=None):
         """ Create a light snapshot of a server
         : param server: The :class: `Server` (or its ID) to share onto
