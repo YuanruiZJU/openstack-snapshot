@@ -2259,7 +2259,7 @@ class API(base.Base):
     @check_instance_cell
     @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.STOPPED,
                                     vm_states.PAUSED, vm_states.SUSPENDED])
-    def light_snapshot(self, context, instance):
+    def light_recover(self, context, instance):
         """Recover the instance from its snapshot.
 
         :param instance: nova.objects.instance.Instance object
