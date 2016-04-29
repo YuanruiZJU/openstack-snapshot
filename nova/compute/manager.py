@@ -3011,6 +3011,7 @@ class ComputeManager(manager.Manager):
             supports. """
         try:
             instance.task_state = snapshot_task_states.VM_SNAPSHOT
+            expected_task_state = snapshot_task_states.VM_SNAPSHOT_PENDING
             def update_task_state(task_state,
                                   expected_state=expected_task_state):
                 instance.task_state = task_state
