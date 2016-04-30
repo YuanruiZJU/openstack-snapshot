@@ -3011,8 +3011,6 @@ class ComputeManager(manager.Manager):
     def light_snapshot_instance(self, context, instance):
         """ Take a light-snapshot for the instance using the function libvirt
             supports. """
-        import pdb
-        pdb.set_trace()
         try:
             instance.task_state = snapshot_task_states.VM_SNAPSHOT
             instance.save(
