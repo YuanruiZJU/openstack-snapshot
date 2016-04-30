@@ -64,6 +64,10 @@ from nova.compute import arch
 from nova.compute import hv_type
 from nova.compute import power_state
 from nova.compute import task_states
+
+# Added by YuanruiFan. some task states for light_snapshot
+from nova.compute.light_snapshot import snapshot_task_states
+
 from nova.compute import utils as compute_utils
 from nova.compute import vm_mode
 from nova.console import serial as serial_console
@@ -1643,12 +1647,121 @@ class LibvirtDriver(driver.ComputeDriver):
     # Added by Yuanrui Fan. This function is used to create a light-snapshot
     # for the instance.
     def light_snapshot(self, context, instance, update_task_state):
-        """Create snapshot from a running VM instance.
-        We want to add the function of create external snapshot for vm
-        supported by libvirt to Nova. So that you can create external snapshot
-        for OpenStack instances."""
-        pass;
+        """ Create snapshot from a running VM instance.
+            We want to add the function of create external snapshot for vm
+            supported by libvirt to Nova. So that you can create external snapshot
+            for OpenStack instances.
+            
+            :param instance: VM instance object reference  
+        """
+        import pdb
+        pdb.set_trace()
+        LOG.debug("light_snapshot_instance", instance=instance)
+        
+        try:
+            guest = self._host.get_guest(instance)
 
+            # TODO(sahid): We are converting all calls from a
+            # virDomain object to use nova.virt.libvirt.Guest.
+            # We should be able to remove virt_dom at the end.
+            virt_dom = guest._domain
+        except exception.InstanceNotFound:
+            raise exception.InstanceNotRunning(instance_id=instance.uuid)
+        
+
+        try:
+            self._create_external_snapshot(context, instance, virt_dom)
+        
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                LOG.exception(_LE('Error occurred during '
+                                  'creating external snapshot for instance.'),
+                              instance=instance)
+
+        update_task_state(snapshot_task_states.VM_SNAPSHOT_COMMIT)
+
+    # Added by YuanruiFan. This function will call the libvirt api for 
+    # creating external snapshot for an instance
+    def _create_external_snapshot(self, context, instance, domain):
+        """
+           Create an external snapshot for an instance.
+        
+           :param domain: VM that we want to snapshot
+        """
+     
+        # TODO(sahid): An object Guest should be passed instead of
+        # a "domain" as virDomain.
+        guest = libvirt_guest.Guest(domain)
+        xml = guest.get_xml_desc()
+        xml_doc = etree.fromstring(xml)       
+
+        device_info = vconfig.LibvirtConfigGuest()
+        device_info.parse_dom(xml_doc)
+
+        disks_to_snap = []          # to be snapshotted by libvirt
+
+        for guest_disk in device_info.devices:
+            disk_info = {
+                'dev': guest_disk.target_dev,
+                'serial': guest_disk.serial,
+                'current_file': guest_disk.source_path,
+                'source_protocol': guest_disk.source_protocol,
+                'source_name': guest_disk.source_name,
+                'source_hosts': guest_disk.source_hosts,
+                'source_ports': guest_disk.source_ports
+            }
+            
+            new_file = disk_info['current_file'] + '_snapshot'
+            # Determine path for new_file based on current path
+            if disk_info['current_file'] is not None:
+                current_file = disk_info['current_file']
+                new_file_path = os.path.join(os.path.dirname(current_file),
+                                             new_file)
+                disks_to_snap.append((current_file, new_file_path))
+
+        if not disks_to_snap:
+            msg = _('Found no disk to snapshot.')
+            raise exception.NovaException(msg)
+
+        snapshot = vconfig.LibvirtConfigGuestSnapshot()
+
+        for current_name, new_filename in disks_to_snap:
+            snap_disk = vconfig.LibvirtConfigGuestSnapshotDisk()
+            snap_disk.name = current_name
+            snap_disk.source_path = new_filename
+            snap_disk.source_type = 'file'
+            snap_disk.snapshot = 'external'
+            snap_disk.driver_name = 'qcow2'
+
+            snapshot.add_disk(snap_disk)
+
+        snapshot_xml = snapshot.to_xml()
+        LOG.debug("snap xml: %s", snapshot_xml, instance=instance)
+
+        snap_flags = (libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_DISK_ONLY |
+                      libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_NO_METADATA)
+
+        try:
+            domain.snapshotCreateXML(snapshot_xml, snap_flags)
+        except libvirt.libvirtError:
+            LOG.exception(_LE('Unable to create VM snapshot, '
+                              'failing volume_snapshot operation.'),
+                          instance=instance)
+
+            raise
+
+
+
+    # Added by Yuanrui Fan. This function is used to recover the instance from
+    # its snapshot.
+    def recover_instance_from_snapshot(self, context, instance, update_task_state):
+        pass
+
+
+    # Added by Yuanrui Fan. This function is used to commit the snapshot of
+    # the instance.
+    def commit_light_snapshot(self, context, instance, update_task_state):
+        pass
 
     def _volume_snapshot_create(self, context, instance, domain,
                                 volume_id, new_file):
