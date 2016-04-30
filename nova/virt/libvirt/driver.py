@@ -1642,13 +1642,12 @@ class LibvirtDriver(driver.ComputeDriver):
 
     # Added by Yuanrui Fan. This function is used to create a light-snapshot
     # for the instance.
-    def light_snapshot(self, instance, update_task_state):
+    def light_snapshot(self, context, instance, update_task_state):
         """Create snapshot from a running VM instance.
         We want to add the function of create external snapshot for vm
         supported by libvirt to Nova. So that you can create external snapshot
         for OpenStack instances."""
         pass;
-
 
 
     def _volume_snapshot_create(self, context, instance, domain,
