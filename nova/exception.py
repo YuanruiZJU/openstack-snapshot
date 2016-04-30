@@ -397,6 +397,11 @@ class InstanceInvalidState(Invalid):
 class InstanceNotRunning(Invalid):
     msg_fmt = _("Instance %(instance_id)s is not running.")
 
+# Added by YuanruiFan. This exception is raised when we do
+# light snapshot for instance that is not running.
+class InstanceNotRunningInLightSnapshot(Invalid):
+    msg_fmt = _("Instance %(instance_id)s is not running, it cannot do light snapshot.")
+
 class InstanceNotInRescueMode(Invalid):
     msg_fmt = _("Instance %(instance_id)s is not in rescue mode")
 
