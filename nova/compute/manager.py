@@ -3006,23 +3006,80 @@ class ComputeManager(manager.Manager):
 
     # Added by YuanruiFan. To create a light-snapshot for instance
     @wrap_exception()
+    @reverts_task_state
+    @wrap_instance_fault
     def light_snapshot_instance(self, context, instance):
         """ Take a light-snapshot for the instance using the function libvirt
             supports. """
+        import pdb
+        pdb.set_trace()
         try:
             instance.task_state = snapshot_task_states.VM_SNAPSHOT
-            expected_task_state = snapshot_task_states.VM_SNAPSHOT_PENDING
+            instance.save(
+                        expected_task_state=snapshot_task_states.VM_SNAPSHOT_PENDING)
+        except exception.InstanceNotFound:
+            # possibility instance no longer exists, no point in continuing
+            LOG.debug("Instance not found, could not set state %s "
+                      "for instance.",
+                      snapshot_task_states.VM_SNAPSHOT, instance=instance)
+            return
+
+        except exception.UnexpectedDeletingTaskStateError:
+            LOG.debug("Instance being deleted, snapshot cannot continue",
+                      instance=instance)
+            return
+
+        self._light_snapshot_instance(context, instance, snapshot_task_states.VM_SNAPSHOT)
+
+    # Added by YuanruiFan. This function will call the API supported by libvirt/driver.py.
+    def _light_snapshot_instance(self, context, instance, expected_task_state):
+        context = context.elevated()
+
+        instance.power_state = self._get_power_state(context, instance)
+        try:
+            instance.save()
+
+            LOG.info(_LI('instance light snapshotting'), context=context,
+                  instance=instance)
+
+            if instance.power_state != power_state.RUNNING:
+                state = instance.power_state
+                running = power_state.RUNNING
+                LOG.error(_LW('trying to snapshot a non-running instance: '
+                                '(state: %(state)s expected: %(running)s)'),
+                            {'state': state, 'running': running},
+                            instance=instance)
+                raise exception.InstanceNotRunningInLightSnapshot(instance_id=instance.uuid) 
+
+            self._notify_about_instance_usage(
+                context, instance, "light_snapshot.start")
+
             def update_task_state(task_state,
                                   expected_state=expected_task_state):
                 instance.task_state = task_state
                 instance.save(expected_task_state=expected_state)
-            self.driver.light_snapshot(instance, update_task_state)
-        except:
-            return
+
+            self.driver.light_snapshot(context, instance, update_task_state)
+
+            instance.task_state = None
+            instance.save(expected_task_state=snapshot_task_states.VM_SNAPSHOT_COMMIT)
+
+            self._notify_about_instance_usage(context, instance,
+                                              "light_snapshot.end")
+        except (exception.InstanceNotFound,
+                exception.UnexpectedDeletingTaskStateError):
+            # the instance got deleted during the snapshot
+            # Quickly bail out of here
+            msg = 'Instance disappeared during light snapshot'
+            LOG.debug(msg, instance=instance)
+
+         
 
     # Added by YuanruiFan. To recover vm from the external snapshot 
     # we create if the vm is down and data is lost.
     @wrap_exception()
+    @reverts_task_state
+    @wrap_instance_fault
     def light_recover_instance(self, context, instance):
         """ If vm is down unexpectively and data is lost, we can use
         this function to recover the vm."""
@@ -3030,6 +3087,8 @@ class ComputeManager(manager.Manager):
 
     # Added by YuanruiFan. To commit the last external snapshot.
     @wrap_exception()
+    @reverts_task_state
+    @wrap_instance_fault
     def light_commit_snapshot(self, context, instance):
         """If the vm user has some important update in the snapshot, 
         and want to quickly commit the root disk and save it, we use 
