@@ -1654,8 +1654,6 @@ class LibvirtDriver(driver.ComputeDriver):
             
             :param instance: VM instance object reference  
         """
-        import pdb
-        pdb.set_trace()
         LOG.debug("light_snapshot_instance", instance=instance)
         
         try:
@@ -1701,6 +1699,12 @@ class LibvirtDriver(driver.ComputeDriver):
         disks_to_snap = []          # to be snapshotted by libvirt
 
         for guest_disk in device_info.devices:
+            if (guest_disk.root_name != 'disk'):
+                continue
+          
+            if (guest_disk.target_dev is None):
+                continue
+
             disk_info = {
                 'dev': guest_disk.target_dev,
                 'serial': guest_disk.serial,
@@ -1720,7 +1724,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 disks_to_snap.append((current_file, new_file_path))
 
         if not disks_to_snap:
-            msg = _('Found no disk to snapshot.')
+            msg = _('Found no disk to create external snapshot.')
             raise exception.NovaException(msg)
 
         snapshot = vconfig.LibvirtConfigGuestSnapshot()
@@ -1745,7 +1749,7 @@ class LibvirtDriver(driver.ComputeDriver):
             domain.snapshotCreateXML(snapshot_xml, snap_flags)
         except libvirt.libvirtError:
             LOG.exception(_LE('Unable to create VM snapshot, '
-                              'failing volume_snapshot operation.'),
+                              'failing creating external snapshot for instance.'),
                           instance=instance)
 
             raise
@@ -1762,6 +1766,50 @@ class LibvirtDriver(driver.ComputeDriver):
     # the instance.
     def commit_light_snapshot(self, context, instance, update_task_state):
         pass
+
+
+    # Added by Yuanrui Fan. This function is used to commonly commit from top 
+    # file to base file of a device. This function is just designed for test
+    def _commit_back_disk(self, context, instance, domain):
+        """
+           Commit the changes of the external snapshot to its backing file.
+      
+           :param domain: VM that we want to commit the snapshot
+        """
+        try:
+            guest = self._host.get_guest(instance)
+
+            # TODO(sahid): We are converting all calls from a
+            # virDomain object to use nova.virt.libvirt.Guest.
+            # We should be able to remove virt_dom at the end.
+            virt_dom = guest._domain
+        except exception.InstanceNotFound:
+            raise exception.InstanceNotRunning(instance_id=instance.uuid)
+
+
+        # source_format is an on-disk format
+        # source_type is a backend type
+        disk_path, source_format = libvirt_utils.find_disk(virt_dom)
+        source_type = libvirt_utils.get_disk_type_from_path(disk_path)
+        src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
+                                                            format=source_format,
+                                                            basename=False)
+
+        commit_base = src_back_path
+        commit_top = disk_path
+        commit_disk = 'vda'
+        dev = guest.get_block_device(commit_disk)
+        result = dev.commit(commit_base, commit_top)
+        
+        if result == 0:
+            LOG.debug('blockCommit started successfully',
+                      instance=instance)
+
+        while dev.wait_for_job(abort_on_error=True):
+            LOG.debug('waiting for blockCommit job completion',
+                      instance=instance)
+            time.sleep(0.5)
+
 
     def _volume_snapshot_create(self, context, instance, domain,
                                 volume_id, new_file):
