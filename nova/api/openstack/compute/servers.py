@@ -1102,7 +1102,7 @@ class ServersController(wsgi.Controller):
     @extensions.expected_errors((400, 403, 404, 409))
     @wsgi.action('commitSnapshot')
     def _light_commit_snapshot(self, req, id, body):
-        """ recover the instance from its snapshot"""
+        """Commit the snapshot of an instance."""
         context = req.environ['nova.context']
         instance = self._get_instance(context, id)
         authorize(context, instance, 'commit_snapshot')
