@@ -1770,7 +1770,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
     # Added by Yuanrui Fan. This function is used to commonly commit from top 
     # file to base file of a device. This function is just designed for test
-    def _commit_back_disk(self, context, instance, domain):
+    def _commit_back_disk(self, context, instance):
         """
            Commit the changes of the external snapshot to its backing file.
       
@@ -1799,7 +1799,15 @@ class LibvirtDriver(driver.ComputeDriver):
         commit_top = disk_path
         commit_disk = 'vda'
         dev = guest.get_block_device(commit_disk)
-        result = dev.commit(commit_base, commit_top)
+
+        # Abort is an idempotent operation, so make sure any block
+        # jobs which may have failed are ended.
+        try:
+            dev.abort_job()
+        except Exception:
+            pass
+
+        result = dev.commit_active(commit_base, commit_top)
         
         if result == 0:
             LOG.debug('blockCommit started successfully',
@@ -1810,7 +1818,12 @@ class LibvirtDriver(driver.ComputeDriver):
                       instance=instance)
             time.sleep(0.5)
 
+        try:
+            dev.abort_job(pivot=True)
+        except Exception:
+            pass
 
+         
     def _volume_snapshot_create(self, context, instance, domain,
                                 volume_id, new_file):
         """Perform volume snapshot.

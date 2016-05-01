@@ -3091,7 +3091,60 @@ class ComputeManager(manager.Manager):
         """If the vm user has some important update in the snapshot, 
         and want to quickly commit the root disk and save it, we use 
         this function."""
-        pass
+        try:
+            instance.task_state = snapshot_task_states.VM_COMMITING
+            instance.save(
+                        expected_task_state=snapshot_task_states.VM_COMMIT_START)
+        except exception.InstanceNotFound:
+            # possibility instance no longer exists, no point in continuing
+            LOG.debug("Instance not found, could not set state %s "
+                      "for instance.",
+                      snapshot_task_states.VM_COMMITING, instance=instance)
+            return
+
+        except exception.UnexpectedDeletingTaskStateError:
+            LOG.debug("Instance being deleted, commit cannot continue",
+                      instance=instance)
+            return
+
+        self._light_commit_snapshot(context, instance, snapshot_task_states.VM_COMMITING)
+
+    
+    # Added by YuanruiFan. This function will call the API supported by libvirt/driver.py
+    def _light_commit_snapshot(self, context, instance, expected_task_state):
+        import pdb
+        pdb.set_trace()
+        context = context.elevated()
+
+        try:
+            instance.save()
+
+            LOG.info(_LI('instance committing snapshot'), context=context,
+                  instance=instance)
+
+            self._notify_about_instance_usage(
+                context, instance, "commit_snapshot.start")
+
+            def update_task_state(task_state,
+                                  expected_state=expected_task_state):
+                instance.task_state = task_state
+                instance.save(expected_task_state=expected_state)
+
+            self.driver._commit_back_disk(context, instance)
+
+            instance.task_state = None
+            instance.save(expected_task_state=snapshot_task_states.VM_COMMITING)
+
+            self._notify_about_instance_usage(context, instance,
+                                              "commit_snapshot.end")
+        except (exception.InstanceNotFound,
+                exception.UnexpectedDeletingTaskStateError):
+            # the instance got deleted during the snapshot
+            # Quickly bail out of here
+            msg = 'Instance disappeared during commit snapshot'
+            LOG.debug(msg, instance=instance)
+ 
+ 
 
     @wrap_exception()
     @reverts_task_state
