@@ -3129,7 +3129,7 @@ class ComputeManager(manager.Manager):
             self._notify_about_instance_usage(
                 context, instance, "commit_snapshot.start")
 
-            self.driver._commit_back_disk(context, instance)
+            self.driver.commit_light_snapshot(context, instance)
 
             instance.task_state = None
             instance.save(expected_task_state = expected_task_state)
