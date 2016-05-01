@@ -1764,15 +1764,70 @@ class LibvirtDriver(driver.ComputeDriver):
 
     # Added by Yuanrui Fan. This function is used to commit the snapshot of
     # the instance.
-    def commit_light_snapshot(self, context, instance, update_task_state):
-        pass
+    def commit_light_snapshot(self, context, instance):
+        """commit the last snapshot to the root disk
+
+           :param instance object reference
+        """
+        try:
+            guest = self._host.get_guest(instance)
+
+            # TODO(sahid): We are converting all calls from a
+            # virDomain object to use nova.virt.libvirt.Guest.
+            # We should be able to remove virt_dom at the end.
+            virt_dom = guest._domain
+        except exception.InstanceNotFound:
+            raise exception.InstanceNotRunning(instance_id=instance.uuid)
+
+
+        # source_format is an on-disk format
+        # source_type is a backend type
+        disk_path, source_format = libvirt_utils.find_disk(virt_dom)
+        source_type = libvirt_utils.get_disk_type_from_path(disk_path)
+        src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
+                                                            format=source_format,
+                                                            basename=False)
+
+        commit_base = os.path.join(os.path.dirname(disk_path), 'disk')       
+        while src_back_path != commit_base:
+            disk_path = src_back_path
+            src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
+                                                                format=source_format,
+                                                                basename=False) 
+
+        commit_top = disk_path
+        commit_disk = 'vda'
+        dev = guest.get_block_device(commit_disk)
+
+        # Abort is an idempotent operation, so make sure any block
+        # jobs which may have failed are ended.
+        try:
+            dev.abort_job()
+        except Exception:
+            pass
+
+        result = dev.commit(commit_base, commit_top)
+
+        if result == 0:
+            LOG.debug('blockCommit started successfully',
+                      instance=instance)
+
+        while dev.wait_for_job(abort_on_error=True):
+            LOG.debug('waiting for blockCommit job completion',
+                      instance=instance)
+            time.sleep(0.5)
+
+        try:
+            dev.abort_job(pivot=True)
+        except Exception:
+            pass
 
 
     # Added by Yuanrui Fan. This function is used to commonly commit from top 
     # file to base file of a device. This function is just designed for test
     def _commit_back_disk(self, context, instance):
         """
-           Commit the changes of the external snapshot to its backing file.
+           Actively commit the changes of the external snapshot to its backing file.
       
            :param domain: VM that we want to commit the snapshot
         """
