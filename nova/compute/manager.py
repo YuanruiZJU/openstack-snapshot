@@ -3125,18 +3125,17 @@ class ComputeManager(manager.Manager):
             self._notify_about_instance_usage(
                 context, instance, "commit_snapshot.start")
 
-            def update_task_state(task_state,
-                                  expected_state=expected_task_state):
-                instance.task_state = task_state
-                instance.save(expected_task_state=expected_state)
-
             self.driver._commit_back_disk(context, instance)
 
             instance.task_state = None
-            instance.save(expected_task_state=snapshot_task_states.VM_COMMITING)
+            instance.save(expected_task_state = expected_task_state)
 
             self._notify_about_instance_usage(context, instance,
                                               "commit_snapshot.end")
+       
+            LOG.info(_LI('instance snapshot has committed'), context=context,
+                  instance=instance)
+
         except (exception.InstanceNotFound,
                 exception.UnexpectedDeletingTaskStateError):
             # the instance got deleted during the snapshot
