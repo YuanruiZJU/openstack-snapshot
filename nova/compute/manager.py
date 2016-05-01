@@ -3112,8 +3112,12 @@ class ComputeManager(manager.Manager):
     
     # Added by YuanruiFan. This function will call the API supported by libvirt/driver.py
     def _light_commit_snapshot(self, context, instance, expected_task_state):
-        import pdb
-        pdb.set_trace()
+        """ Commit the snapshot to its root disk.
+
+        :param context: security context
+        :param instance: a nova.objects.instance.Instance object
+        """ 
+
         context = context.elevated()
 
         try:
