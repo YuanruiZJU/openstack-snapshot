@@ -2528,13 +2528,13 @@ class LibvirtDriver(driver.ComputeDriver):
                                       block_device_info=block_device_info,
                                       write_to_disk=True)
 
-        if context.auth_token is not None:
-            # NOTE (rmk): Re-populate any missing backing files.
-            backing_disk_info = self._get_instance_disk_info(instance.name,
-                                                             xml,
-                                                             block_device_info)
-            self._create_images_and_backing(context, instance, instance_dir,
-                                            backing_disk_info)
+            if context.auth_token is not None:
+                # NOTE (rmk): Re-populate any missing backing files.
+                backing_disk_info = self._get_instance_disk_info(instance.name,
+                                                                 xml,
+                                                                 block_device_info)
+                self._create_images_and_backing(context, instance, instance_dir,
+                                                backing_disk_info)
 
         # Initialize all the necessary networking, block devices and
         # start the instance.
