@@ -1714,6 +1714,15 @@ class LibvirtDriver(driver.ComputeDriver):
 
         update_task_state(snapshot_task_states.VM_SNAPSHOT_COMMIT)
 
+        try:
+            self.commit_light_snapshot(context, instance)
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                LOG.exception(_LE('Error occurred during '
+                                  'commit the original snapshot for the instance.'),
+                              instance=instance)
+
+
 
     # Added by YuanruiFan. This function will call the libvirt api for 
     # creating external snapshot for an instance
@@ -1841,6 +1850,11 @@ class LibvirtDriver(driver.ComputeDriver):
     # Then launch the instance
     def _recover_instance(self, context, instance, domain):
         
+        # We must get the configuration file of the instance
+        # to reconstruct the instance.
+        guest = libvirt_guest.Guest(domain)
+        xml = guest.get_xml_desc()
+        
         # Get the current disk path of the instance and
         # its backing file's path.
         disk_path, source_format = libvirt_utils.find_disk(domain)
@@ -1863,7 +1877,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                        src_disk_size)
 
         # Finally launch the instance.
-        self._create_domain(domain=domain) 
+        self._create_domain(xml=xml, domain=domain) 
 
 
     # Added by Yuanrui Fan. This function is used to commit the snapshot of
