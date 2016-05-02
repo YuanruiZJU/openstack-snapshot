@@ -142,7 +142,14 @@ compute_opts = [
     cfg.IntOpt('block_device_allocate_retries',
                default=60,
                help='Number of times to retry block device'
-                    ' allocation on failures')
+                    ' allocation on failures'),
+
+    # Added by YuanruiFan. Users can config /etc/nova/nova.conf to
+    # enable or disable or light-snapshot system
+    cfg.BoolOpt('light_snapshot_available',
+                default=True,
+                help='Whether to use our light_snapshot system '
+                     'for the cloud platform')
     ]
 
 interval_opts = [
@@ -2008,6 +2015,9 @@ class ComputeManager(manager.Manager):
                                       injected_files, admin_password,
                                       network_info=network_info,
                                       block_device_info=block_device_info)
+                    if CONF.light_snapshot_available:
+                        self.driver.light_snapshot_init(context, instance)
+
         except (exception.InstanceNotFound,
                 exception.UnexpectedDeletingTaskStateError) as e:
             with excutils.save_and_reraise_exception():

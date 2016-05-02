@@ -1644,6 +1644,38 @@ class LibvirtDriver(driver.ComputeDriver):
             LOG.exception(_LE('Failed to send updated snapshot status '
                               'to volume service.'))
 
+    # Added by YuanruiFan. When user has created an instance, we call this function
+    # to create two external snapshot for initialization
+    def light_snapshot_init(self, context, instance):
+        """Create two external snapshot while the VM is running.
+
+           :param instance: VM instance object reference.
+        """
+        LOG.debug("while creating VM, create two light snapshots for VM.", instance = instance)
+
+        try:
+            guest = self._host.get_guest(instance)
+         
+            # TODO(sahid): We are converting all calls from a
+            # virDomain object to use nova.virt.libvirt.Guest.
+            # We should be able to remove virt_dom at the end.
+            virt_dom = guest._domain
+        except exception.InstanceNotFound:
+            raise exception.InstanceNotRunning(instance_id=instance.uuid)
+
+
+        try:
+            self._create_external_snapshot(context, instance, virt_dom)
+            self._create_external_snapshot(context, instance, virt_dom)
+
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                LOG.exception(_LE('Error occurred during '
+                                  'creating external snapshot for instance.'),
+                              instance=instance)
+
+
+
     # Added by Yuanrui Fan. This function is used to create a light-snapshot
     # for the instance.
     def light_snapshot(self, context, instance, update_task_state):
@@ -1677,6 +1709,8 @@ class LibvirtDriver(driver.ComputeDriver):
                               instance=instance)
 
         update_task_state(snapshot_task_states.VM_SNAPSHOT_COMMIT)
+
+    disk_n = 0
 
     # Added by YuanruiFan. This function will call the libvirt api for 
     # creating external snapshot for an instance
@@ -1715,7 +1749,8 @@ class LibvirtDriver(driver.ComputeDriver):
                 'source_ports': guest_disk.source_ports
             }
             
-            new_file = disk_info['current_file'] + '_snapshot'
+            new_file = 'disk' + str(self.disk_n)
+            self.disk_n = self.disk_n + 1
             # Determine path for new_file based on current path
             if disk_info['current_file'] is not None:
                 current_file = disk_info['current_file']
