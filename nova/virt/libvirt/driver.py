@@ -1818,7 +1818,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
     # Added by Yuanrui Fan. This function is used to recover the instance from
     # its snapshot.
-    def recover_instance_from_snapshot(self, context, instance):
+    def recover_instance_from_snapshot(self, context, instance, network_info, block_device_info):
         """recover the instance from its last snapshot
  
           :param instance: instance object reference
@@ -1837,7 +1837,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
 
         try:
-            self._recover_instance(context, instance, virt_dom)
+            self._recover_instance(context, instance, virt_dom, network_info, block_device_info)
 
         except Exception:
             with excutils.save_and_reraise_exception():
@@ -1848,12 +1848,8 @@ class LibvirtDriver(driver.ComputeDriver):
     # Added by YuanruiFan. This function will first poweroff the instance
     # and create a new image based on the snapshot of the instance and
     # Then launch the instance
-    def _recover_instance(self, context, instance, domain):
+    def _recover_instance(self, context, instance, domain, network_info, block_device_info):
         
-        # We must get the configuration file of the instance
-        # to reconstruct the instance.
-        guest = libvirt_guest.Guest(domain)
-        xml = guest.get_xml_desc()
         
         # Get the current disk path of the instance and
         # its backing file's path.
@@ -1864,7 +1860,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                             basename=False)
  
         # Power off the instance 
-        self._destroy(instance)
+        self.power_off(instance)
 
         # remove the original writable disk of the instance
         # and create a new one with the same backing file
@@ -1877,7 +1873,10 @@ class LibvirtDriver(driver.ComputeDriver):
                                        src_disk_size)
 
         # Finally launch the instance.
-        self._create_domain(xml=xml, domain=domain) 
+        self.power_on(context, instance, network_info,
+                          block_device_info)
+
+
 
 
     # Added by Yuanrui Fan. This function is used to commit the snapshot of

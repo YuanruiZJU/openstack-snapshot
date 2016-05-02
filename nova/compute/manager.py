@@ -3123,7 +3123,13 @@ class ComputeManager(manager.Manager):
             self._notify_about_instance_usage(
                 context, instance, "recover_instance.start")
 
-            self.driver.recover_instance_from_snapshot(context, instance)
+            block_device_info = self._get_instance_block_device_info(context,
+                                                                     instance)
+
+            network_info = self.network_api.get_instance_nw_info(context, instance)
+
+
+            self.driver.recover_instance_from_snapshot(context, instance,network_info,block_device_info)
 
             instance.task_state = None
             instance.save(expected_task_state=snapshot_task_states.VM_RECOVER_FROM_SNAPSHOT)
