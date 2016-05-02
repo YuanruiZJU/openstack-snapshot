@@ -304,6 +304,10 @@ CONF.import_group('workarounds', 'nova.utils')
 CONF.import_opt('iscsi_use_multipath', 'nova.virt.libvirt.volume.iscsi',
                 group='libvirt')
 
+# Added by YuanruiFan. We want to add this opt to tell the 
+# system whether we want to use light-snapshot system
+CONF.import_opt('light_snapshot_enabled', 'nova.compute.manager')
+
 DEFAULT_FIREWALL_DRIVER = "%s.%s" % (
     libvirt_firewall.__name__,
     libvirt_firewall.IptablesFirewallDriver.__name__)
@@ -1805,8 +1809,61 @@ class LibvirtDriver(driver.ComputeDriver):
 
     # Added by Yuanrui Fan. This function is used to recover the instance from
     # its snapshot.
-    def recover_instance_from_snapshot(self, context, instance, update_task_state):
-        pass
+    def recover_instance_from_snapshot(self, context, instance):
+        """recover the instance from its last snapshot
+ 
+          :param instance: instance object reference
+        """
+        LOG.debug("light_snapshot_instance", instance=instance)
+
+        try:
+            guest = self._host.get_guest(instance)
+
+            # TODO(sahid): We are converting all calls from a
+            # virDomain object to use nova.virt.libvirt.Guest.
+            # We should be able to remove virt_dom at the end.
+            virt_dom = guest._domain
+        except exception.InstanceNotFound:
+            raise exception.InstanceNotRunning(instance_id=instance.uuid)
+
+
+        try:
+            self._recover_instance(context, instance, virt_dom)
+
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                LOG.exception(_LE('Error occurred during '
+                                  'recover the instance from its snapshot.'),
+                              instance=instance)
+
+    # Added by YuanruiFan. This function will first poweroff the instance
+    # and create a new image based on the snapshot of the instance and
+    # Then launch the instance
+    def _recover_instance(self, context, instance, domain):
+        
+        # Get the current disk path of the instance and
+        # its backing file's path.
+        disk_path, source_format = libvirt_utils.find_disk(domain)
+        source_type = libvirt_utils.get_disk_type_from_path(disk_path)
+        src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
+                                                            format=source_format,
+                                                            basename=False)
+ 
+        # Power off the instance 
+        self._destroy(instance)
+
+        # remove the original writable disk of the instance
+        # and create a new one with the same backing file
+        # and the same filename. 
+        src_disk_size = libvirt_utils.get_disk_size(disk_path,
+                                                    format=source_format)
+
+        utils.execute('rm', '-rf', disk_path)
+        libvirt_utils.create_cow_image(src_back_path, disk_path,
+                                       src_disk_size)
+
+        # Finally launch the instance.
+        self._create_domain(domain=domain) 
 
 
     # Added by Yuanrui Fan. This function is used to commit the snapshot of
@@ -1814,7 +1871,7 @@ class LibvirtDriver(driver.ComputeDriver):
     def commit_light_snapshot(self, context, instance):
         """commit the last snapshot to the root disk
 
-           :param instance object reference
+           :param instance: instance  object reference
         """
         try:
             guest = self._host.get_guest(instance)
@@ -2494,15 +2551,17 @@ class LibvirtDriver(driver.ComputeDriver):
         re-creates the domain to ensure the reboot happens, as the guest
         OS cannot ignore this action.
         """
+   
+        xml = None
+        if CONF.light_snapshot_enabled:    
+            guest = self._host.get_guest(instance)
 
-        guest = self._host.get_guest(instance)
-
-        # TODO(sahid): We are converting all calls from a
-        # virDomain object to use nova.virt.libvirt.Guest.
-        # We should be able to remove virt_dom at the end.
-        virt_dom = guest._domain
-        guest = libvirt_guest.Guest(virt_dom)
-        xml = guest.get_xml_desc()
+            # TODO(sahid): We are converting all calls from a
+            # virDomain object to use nova.virt.libvirt.Guest.
+            # We should be able to remove virt_dom at the end.
+            virt_dom = guest._domain
+            guest = libvirt_guest.Guest(virt_dom)
+            xml = guest.get_xml_desc()
 
         self._destroy(instance)
 

@@ -146,7 +146,7 @@ compute_opts = [
 
     # Added by YuanruiFan. Users can config /etc/nova/nova.conf to
     # enable or disable or light-snapshot system
-    cfg.BoolOpt('light_snapshot_available',
+    cfg.BoolOpt('light_snapshot_enabled',
                 default=True,
                 help='Whether to use our light_snapshot system '
                      'for the cloud platform')
@@ -2015,7 +2015,7 @@ class ComputeManager(manager.Manager):
                                       injected_files, admin_password,
                                       network_info=network_info,
                                       block_device_info=block_device_info)
-                    if CONF.light_snapshot_available:
+                    if CONF.light_snapshot_enabled:
                         self.driver.light_snapshot_init(context, instance)
 
         except (exception.InstanceNotFound,
@@ -3123,12 +3123,7 @@ class ComputeManager(manager.Manager):
             self._notify_about_instance_usage(
                 context, instance, "recover_instance.start")
 
-            def update_task_state(task_state,
-                                  expected_state=expected_task_state):
-                instance.task_state = task_state
-                instance.save(expected_task_state=expected_state)
-
-            self.driver.recover_instance_from_snapshot(context, instance, update_task_state)
+            self.driver.recover_instance_from_snapshot(context, instance)
 
             instance.task_state = None
             instance.save(expected_task_state=snapshot_task_states.VM_RECOVER_FROM_SNAPSHOT)
