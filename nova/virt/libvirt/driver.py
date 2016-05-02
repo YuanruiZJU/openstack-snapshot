@@ -2495,6 +2495,15 @@ class LibvirtDriver(driver.ComputeDriver):
         OS cannot ignore this action.
         """
 
+        guest = self._host.get_guest(instance)
+
+        # TODO(sahid): We are converting all calls from a
+        # virDomain object to use nova.virt.libvirt.Guest.
+        # We should be able to remove virt_dom at the end.
+        virt_dom = guest._domain
+        guest = libvirt_guest.Guest(virt_dom)
+        xml = guest.get_xml_desc()
+
         self._destroy(instance)
 
         # Convert the system metadata to image metadata
@@ -2513,10 +2522,11 @@ class LibvirtDriver(driver.ComputeDriver):
         #             regenerate raw backend images, however, so when it
         #             does we need to (re)generate the xml after the images
         #             are in place.
-        xml = self._get_guest_xml(context, instance, network_info, disk_info,
-                                  image_meta,
-                                  block_device_info=block_device_info,
-                                  write_to_disk=True)
+        if xml is None:
+            xml = self._get_guest_xml(context, instance, network_info, disk_info,
+                                      image_meta,
+                                      block_device_info=block_device_info,
+                                      write_to_disk=True)
 
         if context.auth_token is not None:
             # NOTE (rmk): Re-populate any missing backing files.
