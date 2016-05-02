@@ -1710,7 +1710,6 @@ class LibvirtDriver(driver.ComputeDriver):
 
         update_task_state(snapshot_task_states.VM_SNAPSHOT_COMMIT)
 
-    disk_n = 0
 
     # Added by YuanruiFan. This function will call the libvirt api for 
     # creating external snapshot for an instance
@@ -1749,8 +1748,21 @@ class LibvirtDriver(driver.ComputeDriver):
                 'source_ports': guest_disk.source_ports
             }
             
-            new_file = 'disk' + str(self.disk_n)
-            self.disk_n = self.disk_n + 1
+            current_file = disk_info['current_file']
+            current_filename = current_file.split('/')[-1]
+            if current_filename == 'disk':
+                new_file = os.path.join(os.path.dirname(current_file), 'disk_snap0')
+            elif len(current_filename) > 9 and current_filename[0:9] == 'disk_snap' \
+                 and current_filename[9:].isdigit():
+                snap_index_str = current_filename[9:]
+                snap_index = int(snap_index_str) + 1
+                snap_index_str = str(snap_index)
+                current_snap_str = 'disk_snap' + snap_index_str;
+                new_file = os.path.join(os.path.dirname(current_file), current_snap_str)
+            else:
+                msg = _('Unknown disk name for instance. Cannot light snapshot this disk.')
+                raise exception.NovaException(msg)
+
             # Determine path for new_file based on current path
             if disk_info['current_file'] is not None:
                 current_file = disk_info['current_file']
