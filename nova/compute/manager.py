@@ -3091,7 +3091,58 @@ class ComputeManager(manager.Manager):
     def light_recover_instance(self, context, instance):
         """ If vm is down unexpectively and data is lost, we can use
         this function to recover the vm."""
-        pass
+        try:
+            instance.task_state = snapshot_task_states.VM_RECOVER_FROM_SNAPSHOT
+            instance.save(
+                        expected_task_state=snapshot_task_states.VM_RECOVER_START)
+        except exception.InstanceNotFound:
+            # possibility instance no longer exists, no point in continuing
+            LOG.debug("Instance not found, could not set state %s "
+                      "for instance.",
+                      snapshot_task_states.VM_RECOVER_FROM_SNAPSHOT, instance=instance)
+            return
+
+        except exception.UnexpectedDeletingTaskStateError:
+            LOG.debug("Instance being deleted, recover cannot continue",
+                      instance=instance)
+            return
+
+        self._light_recover_instance(context, instance, snapshot_task_states.VM_RECOVER_FROM_SNAPSHOT)
+
+
+    #Added by YuanruiFan. To recover the vm from its last external snapshot
+    def _light_recover_instance(self, context, instance, expected_task_state):
+        context = context.elevated()
+
+        try:
+            instance.save()
+
+            LOG.info(_LI('recovering instance from its snapshot'), context=context,
+                  instance=instance)
+
+            self._notify_about_instance_usage(
+                context, instance, "recover_instance.start")
+
+            def update_task_state(task_state,
+                                  expected_state=expected_task_state):
+                instance.task_state = task_state
+                instance.save(expected_task_state=expected_state)
+
+            self.driver.recover_instance_from_snapshot(context, instance, update_task_state)
+
+            instance.task_state = None
+            instance.save(expected_task_state=snapshot_task_states.VM_RECOVER_FROM_SNAPSHOT)
+
+            self._notify_about_instance_usage(context, instance,
+                                              "recover_instance.end")
+        except (exception.InstanceNotFound,
+                exception.UnexpectedDeletingTaskStateError):
+            # the instance got deleted during the snapshot
+            # Quickly bail out of here
+            msg = 'Instance disappeared during recovering the instance'
+            LOG.debug(msg, instance=instance)
+        
+ 
 
     # Added by YuanruiFan. To commit the last external snapshot.
     @wrap_exception()
