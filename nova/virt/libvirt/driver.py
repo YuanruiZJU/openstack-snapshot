@@ -1715,7 +1715,7 @@ class LibvirtDriver(driver.ComputeDriver):
         update_task_state(snapshot_task_states.VM_SNAPSHOT_COMMIT)
 
         try:
-            self.commit_light_snapshot(context, instance)
+            self._commit_light_snapshot(context, instance, guest, virt_dom)
         except Exception:
             with excutils.save_and_reraise_exception():
                 LOG.exception(_LE('Error occurred during '
@@ -1814,6 +1814,8 @@ class LibvirtDriver(driver.ComputeDriver):
 
             raise
 
+        for current_name, new_filename in disks_to_snap:
+            utils.execute('chmod', '644', new_filename, run_as_root=True)
 
 
     # Added by Yuanrui Fan. This function is used to recover the instance from
@@ -1883,7 +1885,7 @@ class LibvirtDriver(driver.ComputeDriver):
         src_disk_size = libvirt_utils.get_disk_size(disk_path,
                                                     format=source_format)
 
-        utils.execute('rm', '-rf', disk_path)
+        utils.execute('rm', '-rf', disk_path, run_as_root=True)
 
         # Finally launch the instance.
         self._create_domain(xml=xml) 
@@ -1904,17 +1906,14 @@ class LibvirtDriver(driver.ComputeDriver):
                               instance=instance)
 
 
-
-
-
-
-    # Added by Yuanrui Fan. This function is used to commit the snapshot of
-    # the instance.
+    # Added by YuanruiFan. This function is used to commit the snapshot of
+    # the instance and then create another external snapshot so that the 
+    # 3-images chain for vm can be maintained
     def commit_light_snapshot(self, context, instance):
-        """commit the last snapshot to the root disk
-
-           :param instance: instance  object reference
+        """commit the last snapshot to the root disk.
+           then create another external snapshot.
         """
+        
         try:
             guest = self._host.get_guest(instance)
 
@@ -1925,6 +1924,29 @@ class LibvirtDriver(driver.ComputeDriver):
         except exception.InstanceNotFound:
             raise exception.InstanceNotRunning(instance_id=instance.uuid)
 
+        # first commit the last snapshot
+        self._commit_light_snapshot(context, instance, guest, virt_dom)
+        
+        # then create another external snapshot for the instance  
+        try:
+            self._create_external_snapshot(context, instance, virt_dom)
+
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                LOG.exception(_LE('Error occurred during '
+                                  'creating external snapshot for instance.'),
+                              instance=instance)
+
+
+
+
+    # Added by Yuanrui Fan. This function is used to commit the snapshot of
+    # the instance.
+    def _commit_light_snapshot(self, context, instance, guest, virt_dom):
+        """commit the last snapshot to the root disk
+
+           :param instance: instance  object reference
+        """
 
         # source_format is an on-disk format
         # source_type is a backend type
