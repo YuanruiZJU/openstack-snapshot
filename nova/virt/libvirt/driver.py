@@ -1850,7 +1850,6 @@ class LibvirtDriver(driver.ComputeDriver):
     # Then launch the instance
     def _recover_instance(self, context, instance, domain, network_info, block_device_info):
         
-        
         # Get the current disk path of the instance and
         # its backing file's path.
         disk_path, source_format = libvirt_utils.find_disk(domain)
@@ -1858,6 +1857,22 @@ class LibvirtDriver(driver.ComputeDriver):
         src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
                                                             format=source_format,
                                                             basename=False)
+
+        # Convert the system metadata to image metadata
+        image_meta = objects.ImageMeta.from_instance(instance)
+
+        instance_dir = libvirt_utils.get_instance_path(instance)
+        fileutils.ensure_tree(instance_dir)
+
+        disk_info = blockinfo.get_disk_info(CONF.libvirt.virt_type,
+                                            instance,
+                                            image_meta,
+                                            block_device_info)
+
+        xml = self._get_guest_xml_disk(context,instance,network_info, disk_info,
+                                       image_meta, src_back_path, 
+                                       block_device_info=block_device_info,
+                                       write_to_disk=True) 
  
         # Power off the instance 
         self.power_off(instance)
@@ -1869,12 +1884,26 @@ class LibvirtDriver(driver.ComputeDriver):
                                                     format=source_format)
 
         utils.execute('rm', '-rf', disk_path)
-        libvirt_utils.create_cow_image(src_back_path, disk_path,
-                                       src_disk_size)
 
         # Finally launch the instance.
-        self.power_on(context, instance, network_info,
-                          block_device_info)
+        self._create_domain(xml=xml) 
+
+        # Create a new external snapshot for the instance
+        try:
+            guest = self._host.get_guest(instance)
+            virt_dom = guest._domain
+        except exception.InstanceNotFound:
+            raise exception.InstanceNotRunning(instance_id=instance.uuid)
+
+        try:
+            self._create_external_snapshot(context, instance, virt_dom)
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                LOG.exception(_LE('Error occurred during '
+                                  'creating external snapshot for instance.'),
+                              instance=instance)
+
+
 
 
 
@@ -2564,18 +2593,16 @@ class LibvirtDriver(driver.ComputeDriver):
         re-creates the domain to ensure the reboot happens, as the guest
         OS cannot ignore this action.
         """
-   
-        xml = None
-        if CONF.light_snapshot_enabled:    
-            guest = self._host.get_guest(instance)
 
-            # TODO(sahid): We are converting all calls from a
-            # virDomain object to use nova.virt.libvirt.Guest.
-            # We should be able to remove virt_dom at the end.
-            virt_dom = guest._domain
-            guest = libvirt_guest.Guest(virt_dom)
-            xml = guest.get_xml_desc()
+        guest = self._host.get_guest(instance)
 
+        # TODO(sahid): We are converting all calls from a
+        # virDomain object to use nova.virt.libvirt.Guest.
+        # We should be able to remove virt_dom at the end.
+        virt_dom = guest._domain
+        disk_path,source_format = libvirt_utils.find_disk(virt_dom)
+
+ 
         self._destroy(instance)
 
         # Convert the system metadata to image metadata
@@ -2588,6 +2615,14 @@ class LibvirtDriver(driver.ComputeDriver):
                                             instance,
                                             image_meta,
                                             block_device_info)
+
+        xml = None
+        if CONF.light_snapshot_enabled:
+            xml = self._get_guest_xml_disk(context, instance, network_info, disk_info,
+                                      image_meta, disk_path,
+                                      block_device_info = block_device_info,
+                                      write_to_disk=True)
+
         # NOTE(vish): This could generate the wrong device_format if we are
         #             using the raw backend and the images don't exist yet.
         #             The create_images_and_backing below doesn't properly
@@ -4759,6 +4794,43 @@ class LibvirtDriver(driver.ComputeDriver):
             tablet.type = "tablet"
             tablet.bus = "usb"
         return tablet
+
+
+    # Added by YuanruiFan. We want to modify the disk path of the instance
+    # when we use our light-snapshot system. So that the instance can launch 
+    # from specified disk path not only 'disk'.
+    def _get_guest_xml_disk(self, context, instance, network_info, disk_info,
+                           image_meta, disk_path, rescue=None,
+                           block_device_info=None, write_to_disk=False):
+        LOG.debug('Start _get_guest_xml_disk'
+                  'and modify the disk path to a specified one', 
+                   instance=instance)
+
+        conf = self._get_guest_config(instance, network_info, image_meta,
+                                      disk_info, rescue, block_device_info,
+                                      context)
+
+        for guest_disk in conf.devices:
+            if (guest_disk.root_name != 'disk'):
+                continue
+
+            if (guest_disk.target_dev is None):
+                continue
+
+            guest_disk.source_path = disk_path
+
+        xml = conf.to_xml()
+
+        if write_to_disk:
+            instance_dir = libvirt_utils.get_instance_path(instance)
+            xml_path = os.path.join(instance_dir, 'libvirt.xml')
+            libvirt_utils.write_to_file(xml_path, xml)
+
+        LOG.debug('End _get_guest_xml_disk xml=%(xml)s',
+                  {'xml': xml}, instance=instance)
+        return xml
+
+        
 
     def _get_guest_xml(self, context, instance, network_info, disk_info,
                        image_meta, rescue=None,
