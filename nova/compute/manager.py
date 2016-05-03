@@ -2015,6 +2015,9 @@ class ComputeManager(manager.Manager):
                                       injected_files, admin_password,
                                       network_info=network_info,
                                       block_device_info=block_device_info)
+
+                    # If we enable light snapshot system, when creating 
+                    # instance, it must first create initial external snapshots
                     if CONF.light_snapshot_enabled:
                         self.driver.light_snapshot_init(context, instance)
 
@@ -2629,6 +2632,13 @@ class ComputeManager(manager.Manager):
             self.driver.spawn(context, instance, image_meta, injected_files,
                               admin_password, network_info=network_info,
                               block_device_info=new_block_device_info)
+
+        # If we enable light snapshot system, when creating
+        # instance, it must first create initial external snapshots
+        if CONF.light_snapshot_enabled:
+            self.driver.light_snapshot_init(context, instance)
+
+        
 
     @messaging.expected_exceptions(exception.PreserveEphemeralNotSupported)
     @wrap_exception()
