@@ -1742,6 +1742,8 @@ class LibvirtDriver(driver.ComputeDriver):
         device_info = vconfig.LibvirtConfigGuest()
         device_info.parse_dom(xml_doc)
 
+        disk_path, source_format = libvirt_utils.find_disk(domain)
+
         disks_to_snap = []          # to be snapshotted by libvirt
 
         for guest_disk in device_info.devices:
@@ -1751,14 +1753,16 @@ class LibvirtDriver(driver.ComputeDriver):
             if (guest_disk.target_dev is None):
                 continue
 
+            if (guest_disk.serial is not None):
+                continue
+
+            if (guest_disk.source_path != disk_path):
+                continue
+ 
             disk_info = {
                 'dev': guest_disk.target_dev,
                 'serial': guest_disk.serial,
                 'current_file': guest_disk.source_path,
-                'source_protocol': guest_disk.source_protocol,
-                'source_name': guest_disk.source_name,
-                'source_hosts': guest_disk.source_hosts,
-                'source_ports': guest_disk.source_ports
             }
             
             current_file = disk_info['current_file']
@@ -1885,7 +1889,7 @@ class LibvirtDriver(driver.ComputeDriver):
         src_disk_size = libvirt_utils.get_disk_size(disk_path,
                                                     format=source_format)
 
-        utils.execute('rm', '-rf', disk_path, run_as_root=True)
+        utils.execute('rm', '-rf', disk_path)
 
         # Finally launch the instance.
         self._create_domain(xml=xml) 
@@ -1956,6 +1960,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                             format=source_format,
                                                             basename=False)
 
+        current_disk_path = disk_path
         commit_base = os.path.join(os.path.dirname(disk_path), 'disk')       
         while src_back_path != commit_base:
             disk_path = src_back_path
@@ -1964,31 +1969,54 @@ class LibvirtDriver(driver.ComputeDriver):
                                                                 basename=False) 
 
         commit_top = disk_path
-        commit_disk = 'vda'
-        dev = guest.get_block_device(commit_disk)
 
-        # Abort is an idempotent operation, so make sure any block
-        # jobs which may have failed are ended.
-        try:
-            dev.abort_job()
-        except Exception:
-            pass
+        xml = guest.get_xml_desc()
+        xml_doc = etree.fromstring(xml)
 
-        result = dev.commit(commit_base, commit_top)
+        device_info = vconfig.LibvirtConfigGuest()
+        device_info.parse_dom(xml_doc)
 
-        if result == 0:
-            LOG.debug('blockCommit started successfully',
-                      instance=instance)
+        for guest_disk in device_info.devices:
+            if (guest_disk.root_name != 'disk'):
+                continue
 
-        while dev.wait_for_job(abort_on_error=True):
-            LOG.debug('waiting for blockCommit job completion',
-                      instance=instance)
-            time.sleep(0.5)
+            if (guest_disk.target_dev is None):
+                continue
 
-        try:
-            dev.abort_job(pivot=True)
-        except Exception:
-            pass
+            if (guest_disk.serial is not None):
+                continue
+
+            if (guest_disk.source_path != current_disk_path):
+                continue
+
+            commit_disk = guest_disk.target_dev
+            dev = guest.get_block_device(commit_disk)
+
+            # Abort is an idempotent operation, so make sure any block
+            # jobs which may have failed are ended.
+            try:
+                dev.abort_job()
+            except Exception:
+                pass
+
+            result = dev.commit(commit_base, commit_top)
+
+            if result == 0:
+                LOG.debug('blockCommit started successfully',
+                          instance=instance)
+
+            while dev.wait_for_job(abort_on_error=True):
+                LOG.debug('waiting for blockCommit job completion',
+                          instance=instance)
+                time.sleep(0.5)
+
+            try:
+                dev.abort_job(pivot=True)
+            except Exception:
+                pass
+
+            utils.execute('rm', '-rf', commit_top)
+
 
 
     # Added by Yuanrui Fan. This function is used to commonly commit from top 
