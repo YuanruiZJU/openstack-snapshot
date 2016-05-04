@@ -3039,6 +3039,66 @@ class ComputeManager(manager.Manager):
         self._do_snapshot_instance(context, image_id, instance, rotation)
         self._rotate_backups(context, instance, backup_type, rotation)
 
+    # Added by YuanruiFan. Enable light-snapshot system for instance.
+    @wrap_exception()
+    @reverts_task_state
+    @wrap_instance_fault
+    def enable_light_snapshot(self, context, instance):
+        import pdb
+        pdb.set_trace()
+        try:
+            LOG.info(_LI('Enable light-snapshot system for instance'), context=context,
+                  instance=instance)
+
+            self._notify_about_instance_usage(
+                context, instance, "enable_light_snapshot.start")
+
+
+            self.driver.light_snapshot_init(context, instance)
+
+            instance.light_snapshot_enable = True
+            instance.save()
+
+            self._notify_about_instance_usage(context, instance,
+                                              "disable_light_snapshot.end")
+        except (exception.InstanceNotFound,
+                exception.UnexpectedDeletingTaskStateError):
+            # the instance got deleted during the snapshot
+            # Quickly bail out of here
+            msg = 'Instance disappeared during enabling light-snapshot system for instance'
+            LOG.debug(msg, instance=instance)
+
+ 
+        
+
+    # Added by YuanruiFan. Disable light-snapshot system for instance
+    @wrap_exception()
+    @reverts_task_state
+    @wrap_instance_fault
+    def disable_light_snapshot(self, context, instance):
+        try:
+            LOG.info(_LI('Disable light-snapshot system for instance'), context=context,
+                  instance=instance)
+
+            self._notify_about_instance_usage(
+                context, instance, "disable_light_snapshot.start")
+
+
+            # TODO
+            # To disable light-snapshot. we must commit contents of all the snapshots
+            # to the root disk of the instance.
+
+            self._notify_about_instance_usage(context, instance,
+                                              "disable_light_snapshot.end")
+        except (exception.InstanceNotFound,
+                exception.UnexpectedDeletingTaskStateError):
+            # the instance got deleted during the snapshot
+            # Quickly bail out of here
+            msg = 'Instance disappeared during disabling light-snapshot system for instance'
+            LOG.debug(msg, instance=instance)
+
+
+
     # Added by YuanruiFan. To create a light-snapshot for instance
     @wrap_exception()
     @reverts_task_state

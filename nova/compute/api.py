@@ -2234,6 +2234,38 @@ class API(base.Base):
                                             rotation)
         return image_meta
 
+
+    # Added by YunaruiFan. Enable the instance to use the light-snapshot
+    # system.
+    @wrap_check_policy
+    @check_instance_host
+    @check_instance_cell
+    @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.STOPPED,
+                                    vm_states.PAUSED, vm_states.SUSPENDED])
+    def enable_light_snapshot(self, context, instance):
+        """Enable light-snapshot system from instance.
+
+        :param instance: nova.objects.instance.Instance object
+        """
+
+        self.compute_rpcapi.enable_snapshot_instance(context, instance)
+
+
+    @wrap_check_policy
+    @check_instance_host
+    @check_instance_cell
+    @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.STOPPED,
+                                    vm_states.PAUSED, vm_states.SUSPENDED])
+    def disable_light_snapshot(self, context, instance):
+        """Disable light-snapshot system for instance.
+
+        :param instance: nova.objects.instance.Instance object
+        """
+
+        self.compute_rpcapi.disable_snapshot_instance(context, instance)
+
+
+
     # Added by YuanruiFan. Take an external snapshot for an instance.
     # We do not check instance lock for snapshot because lock is 
     # intended to prevent accident change/delete of instances.
@@ -2270,7 +2302,7 @@ class API(base.Base):
         instance.task_state = snapshot_task_states.VM_RECOVER_START
         instance.save(expected_task_state=[None])
 
-        self.compute_rpcapi.recover_instance(context, instance)
+        self.compute_rpcapi.light_recover_instance(context, instance)
     
 
     # Added by YuanruiFan. Commit the snapshot to root disk of the instance.
