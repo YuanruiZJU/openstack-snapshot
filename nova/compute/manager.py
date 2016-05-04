@@ -2022,11 +2022,13 @@ class ComputeManager(manager.Manager):
                     # using light-snapshot system, when creating 
                     # instance, it must first create initial external snapshots
                     try:
-                        if CONF.light_snapshot_enabled and instance.light_snapshot_enable:
-                            self.driver.light_snapshot_init(context, instance)
+                        light_snapshot_enabled = instance.light_snapshot_enable
                     except:
                         instance.light_snapshot_enable = False
                         instance.save()
+
+                    if CONF.light_snapshot_enabled and instance.light_snapshot_enable:
+                        self.driver.light_snapshot_init(context, instance)
 
         except (exception.InstanceNotFound,
                 exception.UnexpectedDeletingTaskStateError) as e:
@@ -2644,11 +2646,12 @@ class ComputeManager(manager.Manager):
         # If we enable light snapshot system, when creating
         # instance, it must first create initial external snapshots
         try:
-            if CONF.light_snapshot_enabled and instance.light_snapshot_enable:
-                self.driver.light_snapshot_init(context, instance)
+            light_snapshot_enabled = instance.light_snapshot_enable
         except:
             instance.light_snapshot_enable = False
             instance.save()
+        if CONF.light_snapshot_enabled and instance.light_snapshot_enable:
+            self.driver.light_snapshot_init(context, instance)
 
         
 
