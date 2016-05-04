@@ -1813,14 +1813,14 @@ def do_commit_snapshot(cs, args):
     action="store_true",
     default=False,
     help=_('light snapshot the server daily.'))
-def enable_light_snapshot(cs, args):
+def do_enable_light_snapshot(cs, args):
     daily = args.daily
     server = _find_server(cs, args.server)
     cs.servers.enable_light_snapshot(server, daily)
 
 #Added by YuanruiFan. Add a command line for disable enable-system
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
-def disable_light_snapshot(cs, args):
+def do_disable_light_snapshot(cs, args):
     server = _find_server(cs, args.server)
     cs.servers.disable_light_snapshot(server)
 
