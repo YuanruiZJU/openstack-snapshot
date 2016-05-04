@@ -1050,6 +1050,63 @@ class ServersController(wsgi.Controller):
         robj = wsgi.ResponseObject(view)
         return self._add_location(robj)
 
+    # Added by YuanruiFan. To enable a server to use light-snapshot system.
+    @wsgi.response(202)
+    @extensions.expected_errors((400, 403, 404, 409))
+    @wsgi.action('enableSnapshot')
+    def _enable_light_snapshot(self, req, id, body):
+        """Enable an instance to use light-snapshot system."""
+        context = req.environ['nova.context']
+        instance = self._get_instance(context, id)
+        authorize(context, instance, 'enable_light_snapshot')
+        LOG.debug('enable the instance to use light-snasphot system', instance=instance)
+
+        
+        if instance.light_snapshot_enable:
+            return
+
+        try:
+            self.compute_api.enable_light_snapshot(context, instance)
+        except exception.InstanceNotReady as e:
+            raise webob.exc.HTTPConflict(explanation=e.format_message())
+        except exception.InstanceUnknownCell as e:
+            raise exc.HTTPNotFound(explanation=e.format_message())
+        except exception.InstanceInvalidState as state_error:
+            common.raise_http_conflict_for_instance_invalid_state(state_error,
+                'enable light snapshot for instance', id)
+        except exception.Invalid as err:
+            raise exc.HTTPBadRequest(explanation=err.format_message())
+
+    # Added by YuanruiFan.
+    @wsgi.response(202)
+    @extensions.expected_errors((400, 403, 404, 409))
+    @wsgi.action('disableSnapshot')
+    def _disable_light_snapshot(self, req, id, body):
+        """Disable an instance to use light-snapshot system."""
+        context = req.environ['nova.context']
+        instance = self._get_instance(context, id)
+        authorize(context, instance, 'disable_light_snapshot')
+        LOG.debug('disable light snapshot for instance', instance=instance)
+
+        if not instance.light_snapshot_enable:
+           return
+
+        instance.light_snapshot_enable = False
+        instance.save() 
+
+        try:
+            self.compute_api.disable_light_snapshot(context, instance)
+        except exception.InstanceNotReady as e:
+            raise webob.exc.HTTPConflict(explanation=e.format_message())
+        except exception.InstanceUnknownCell as e:
+            raise exc.HTTPNotFound(explanation=e.format_message())
+        except exception.InstanceInvalidState as state_error:
+            common.raise_http_conflict_for_instance_invalid_state(state_error,
+                'disable light snapshot for instance', id)
+        except exception.Invalid as err:
+            raise exc.HTTPBadRequest(explanation=err.format_message())
+
+
     # Added by YuanruiFan. To create a light snapshot for instance
     @wsgi.response(202)
     @extensions.expected_errors((400, 403, 404, 409))

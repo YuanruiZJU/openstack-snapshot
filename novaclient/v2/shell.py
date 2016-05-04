@@ -1800,9 +1800,31 @@ def do_recover(cs, args):
 # of the instance.
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
 def do_commit_snapshot(cs, args):
-    """Commit the snapshot of the instance."""
     server = _find_server(cs, args.server)
     cs.servers.light_commit(server)
+
+
+# Added by YuanruiFan. Add a command line for enable snapshot-system
+# for the instance
+@cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
+@cliutils.arg(
+    '--daily',
+    dest='daily',
+    action="store_true",
+    default=False,
+    help=_('light snapshot the server daily.'))
+def enable_light_snapshot(cs, args):
+    daily = args.daily
+    server = _find_server(cs, args.server)
+    cs.servers.enable_light_snapshot(server, daily)
+
+#Added by YuanruiFan. Add a command line for disable enable-system
+@cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
+def disable_light_snapshot(cs, args):
+    server = _find_server(cs, args.server)
+    cs.servers.disable_light_snapshot(server)
+
+
 
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
 @cliutils.arg('name', metavar='<name>', help=_('Name of snapshot.'))

@@ -1092,23 +1092,37 @@ class ServerManager(base.BootingManagerWithFind):
 
     # Added by YuanruiFan. To create a external snapshot system.
     # Add some functions for our light snapshot system
-    def light_snapshot(self, server, metadata=None):
+    def light_snapshot(self, server):
         """ Create a light snapshot of a server
         : param server: The :class: `Server` (or its ID) to share onto
         """ 
         self._action('createSnapshot', server, None)
  
-    def light_recover(self, server, metadata=None):
+    def light_recover(self, server):
         """ recover the instance from its snapshot
         : param server: The :class: `Server` (or its ID) to share onto
         """
         self._action('recoverInstance', server, None)
 
-    def light_commit(self, server, metadata=None):
+    def light_commit(self, server):
         """ commit the snapshot to the root disk
         : param server: The :class: `Server` (or its ID) to share onto
         """
         self._action('commitSnapshot', server, None)
+
+
+    def enable_light_snapshot(self, server, daily):
+        """ Enable light-snapshot system for a server.
+        : param server: The :class: `Server` (or its ID) to share onto
+        """
+        body = {'daily':daily}
+        self._action('enableSnapshot', server, body)
+
+    def disable_light_snapshot(self, server):
+        """ Disable light-snapshot system for a server.
+        : param server: The :class: `Server` (or its ID) to share onto
+        """
+        self._action('disableSnapshot', server, None)
 
     def backup(self, server, backup_name, backup_type, rotation):
         """
