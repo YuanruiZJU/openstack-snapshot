@@ -338,6 +338,9 @@ class Instance(BASE, NovaBase):
     # Records whether an instance has been deleted from disk
     cleaned = Column(Integer, default=0)
 
+    # Added by YuanruiFan. We add a column 'light_snapshot_enable' for the instance and
+    # to tell whether the instance allow light-snapshot
+    light_snapshot_enable = Column(Boolean)
 
 
 class InstanceInfoCache(BASE, NovaBase):
