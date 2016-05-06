@@ -2017,8 +2017,6 @@ class ComputeManager(manager.Manager):
                                       block_device_info=block_device_info)
 
                     
-                    import pdb
-                    pdb.set_trace()
                     # Added by YuanruiFan.
                     # If we enable light snapshot system and the instance allows
                     # using light-snapshot system, when creating 
