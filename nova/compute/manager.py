@@ -2017,18 +2017,25 @@ class ComputeManager(manager.Manager):
                                       block_device_info=block_device_info)
 
                     
+                    import pdb
+                    pdb.set_trace()
                     # Added by YuanruiFan.
                     # If we enable light snapshot system and the instance allows
                     # using light-snapshot system, when creating 
                     # instance, it must first create initial external snapshots
                     try:
-                        light_snapshot_enabled = instance.light_snapshot_enable
-                    except:
+                        light_snapshot_enable = instance.light_snapshot_enable
+                    finally:
                         instance.light_snapshot_enable = False
+                        instance.snapshot_committed = True
                         instance.save()
 
-                    if CONF.light_snapshot_enabled and instance.light_snapshot_enable:
+                    if (CONF.light_snapshot_enabled and \
+                        instance.light_snapshot_enable and \
+                        instance.snapshot_committed ):
                         self.driver.light_snapshot_init(context, instance)
+                        instance.snapshot_committed = False
+                        instance.save()
 
         except (exception.InstanceNotFound,
                 exception.UnexpectedDeletingTaskStateError) as e:
@@ -2649,9 +2656,13 @@ class ComputeManager(manager.Manager):
             light_snapshot_enabled = instance.light_snapshot_enable
         except:
             instance.light_snapshot_enable = False
+            instance.snapshot_committed = True
             instance.save()
-        if CONF.light_snapshot_enabled and instance.light_snapshot_enable:
+        if (CONF.light_snapshot_enabled and \
+            instance.light_snapshot_enable):
             self.driver.light_snapshot_init(context, instance)
+            instance.snapshot_committed = False
+            instance.save()
 
         
 
@@ -3044,8 +3055,6 @@ class ComputeManager(manager.Manager):
     @reverts_task_state
     @wrap_instance_fault
     def enable_light_snapshot(self, context, instance):
-        import pdb
-        pdb.set_trace()
         try:
             LOG.info(_LI('Enable light-snapshot system for instance'), context=context,
                   instance=instance)
@@ -3057,10 +3066,11 @@ class ComputeManager(manager.Manager):
             self.driver.light_snapshot_init(context, instance)
 
             instance.light_snapshot_enable = True
+            instance.snapshot_committed = False
             instance.save()
 
             self._notify_about_instance_usage(context, instance,
-                                              "disable_light_snapshot.end")
+                                              "enable_light_snapshot.end")
         except (exception.InstanceNotFound,
                 exception.UnexpectedDeletingTaskStateError):
             # the instance got deleted during the snapshot
@@ -3076,17 +3086,49 @@ class ComputeManager(manager.Manager):
     @reverts_task_state
     @wrap_instance_fault
     def disable_light_snapshot(self, context, instance):
+        """ Disable light-snapshot system for the instance.
+            Then the instance cannot get light-snaphsot.
+        """ 
         try:
+            instance.task_state = snapshot_task_states.DISABLE_SNAPSHOT
+            instance.save()
+
+
+        except exception.InstanceNotFound:
+            # possibility instance no longer exists, no point in continuing
+            LOG.debug("Instance not found, could not set state %s "
+                      "for instance.",
+                      snapshot_task_states.DISABLE_SNAPSHOT, instance=instance)
+            return
+
+        except exception.UnexpectedDeletingTaskStateError:
+            LOG.debug("Instance being deleted, snapshot cannot continue",
+                      instance=instance)
+            return
+
+        self._disable_light_snapshot(context, instance, snapshot_task_states.DISABLE_SNAPSHOT)
+
+
+
+    # Added by YuanruiFan. Disable light-snapshot system for instance.
+    def _disable_light_snapshot(context, instance, expected_task_state):
+        
+        context = context.elevated()
+        instance.power_state = self._get_power_state(context, instance)
+
+        try:        
+            instance.save()
+            
             LOG.info(_LI('Disable light-snapshot system for instance'), context=context,
                   instance=instance)
 
             self._notify_about_instance_usage(
                 context, instance, "disable_light_snapshot.start")
 
-
-            # TODO
-            # To disable light-snapshot. we must commit contents of all the snapshots
-            # to the root disk of the instance.
+            self.driver.disable_light_snapshot(context, instance)  
+        
+            instance.task_state = None
+            instance.save(expected_task_state=expected_task_state)
 
             self._notify_about_instance_usage(context, instance,
                                               "disable_light_snapshot.end")

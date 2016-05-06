@@ -1680,6 +1680,14 @@ class LibvirtDriver(driver.ComputeDriver):
 
 
 
+    # Added by Yuanrui Fan. This function will commit the snapshots to the
+    # root disk of the instance and disable the light-snapshot system for 
+    # the instance
+    def disable_light_snapshot(self, context, instance):
+        
+        # First, get power state of instance
+        pass        
+
     # Added by Yuanrui Fan. This function is used to create a light-snapshot
     # for the instance.
     def light_snapshot(self, context, instance, update_task_state):
@@ -1931,15 +1939,18 @@ class LibvirtDriver(driver.ComputeDriver):
         # first commit the last snapshot
         self._commit_light_snapshot(context, instance, guest, virt_dom)
         
-        # then create another external snapshot for the instance  
-        try:
-            self._create_external_snapshot(context, instance, virt_dom)
+        state = guest.get_power_state(self._host)
 
-        except Exception:
-            with excutils.save_and_reraise_exception():
-                LOG.exception(_LE('Error occurred during '
-                                  'creating external snapshot for instance.'),
-                              instance=instance)
+        # then create another external snapshot for the instance  
+        if state == power_state.RUNNING or state == power_state.PAUSED:
+            try:
+                self._create_external_snapshot(context, instance, virt_dom)
+
+            except Exception:
+                with excutils.save_and_reraise_exception():
+                    LOG.exception(_LE('Error occurred during '
+                                      'creating external snapshot for instance.'),
+                                  instance=instance)
 
 
 
@@ -1960,62 +1971,82 @@ class LibvirtDriver(driver.ComputeDriver):
                                                             format=source_format,
                                                             basename=False)
 
+        state = guest.get_power_state(self._host)
+
         current_disk_path = disk_path
+        disk_path_del = []
         commit_base = os.path.join(os.path.dirname(disk_path), 'disk')       
         while src_back_path != commit_base:
+            disk_path_del.append(disk_path)
             disk_path = src_back_path
             src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
                                                                 format=source_format,
                                                                 basename=False) 
-
+        disk_path_del.append(disk_path)
         commit_top = disk_path
 
-        xml = guest.get_xml_desc()
-        xml_doc = etree.fromstring(xml)
+        # If the domain is active, we use libvirt's API to commit the 
+        # last snapshot
+        if state == power_state.RUNNING or state == power_state.PAUSED:
+            xml = guest.get_xml_desc()
+            xml_doc = etree.fromstring(xml)
 
-        device_info = vconfig.LibvirtConfigGuest()
-        device_info.parse_dom(xml_doc)
+            device_info = vconfig.LibvirtConfigGuest()
+            device_info.parse_dom(xml_doc)
 
-        for guest_disk in device_info.devices:
-            if (guest_disk.root_name != 'disk'):
-                continue
+            for guest_disk in device_info.devices:
+                if (guest_disk.root_name != 'disk'):
+                    continue
 
-            if (guest_disk.target_dev is None):
-                continue
+                if (guest_disk.target_dev is None):
+                    continue
 
-            if (guest_disk.serial is not None):
-                continue
+                if (guest_disk.serial is not None):
+                    continue
 
-            if (guest_disk.source_path != current_disk_path):
-                continue
+                if (guest_disk.source_path != current_disk_path):
+                    continue
 
-            commit_disk = guest_disk.target_dev
-            dev = guest.get_block_device(commit_disk)
+                commit_disk = guest_disk.target_dev
+                dev = guest.get_block_device(commit_disk)
 
-            # Abort is an idempotent operation, so make sure any block
-            # jobs which may have failed are ended.
-            try:
-                dev.abort_job()
-            except Exception:
-                pass
+                # Abort is an idempotent operation, so make sure any block
+                # jobs which may have failed are ended.
+                try:
+                    dev.abort_job()
+                except Exception:
+                    pass
 
-            result = dev.commit(commit_base, commit_top)
+                result = dev.commit(commit_base, commit_top)
 
-            if result == 0:
-                LOG.debug('blockCommit started successfully',
-                          instance=instance)
+                if result == 0:
+                    LOG.debug('blockCommit started successfully',
+                               instance=instance)
 
-            while dev.wait_for_job(abort_on_error=True):
-                LOG.debug('waiting for blockCommit job completion',
-                          instance=instance)
-                time.sleep(0.5)
+                while dev.wait_for_job(abort_on_error=True):
+                    LOG.debug('waiting for blockCommit job completion',
+                              instance=instance)
+                    time.sleep(0.5)
 
-            try:
-                dev.abort_job(pivot=True)
-            except Exception:
-                pass
+                try:
+                    dev.abort_job(pivot=True)
+                except Exception:
+                    pass
+                utils.execute('rm', '-rf', commit_top)
 
-            utils.execute('rm', '-rf', commit_top)
+        else:
+            LOG.info(_LI("commit snapshot for instance that is not active."),
+                         instance=instance)
+
+            self._disk_commit(current_disk_path, commit_base)
+            instance.snapshot_committed = True
+            instance.save()
+
+            for path in disk_path_del:
+                utils.execute('rm', '-rf', path) 
+            LOG.info(_LI("commit snapshot successfully for instance that is not active."),
+                         instance=instance)
+
 
 
 
@@ -2667,7 +2698,16 @@ class LibvirtDriver(driver.ComputeDriver):
                                             block_device_info)
 
         xml = None
-        if CONF.light_snapshot_enabled:
+        try:
+            light_snapshot_enable = instance.light_snapshot_enable
+        except:
+            instance.light_snapshot_enable = False
+            instance.snapshot_committed = True
+            instance.save()
+
+        if (CONF.light_snapshot_enabled and \
+            instance.light_snapshot_enable and \
+            (not instance.snapshot_committed)):
             xml = self._get_guest_xml_disk(context, instance, network_info, disk_info,
                                       image_meta, disk_path,
                                       block_device_info = block_device_info,
@@ -2714,6 +2754,13 @@ class LibvirtDriver(driver.ComputeDriver):
 
         timer = loopingcall.FixedIntervalLoopingCall(_wait_for_reboot)
         timer.start(interval=0.5).wait()
+ 
+        if (CONF.light_snapshot_enabled and \
+            instance.light_snapshot_enable and \
+            instance.snapshot_committed):
+            self.light_snapshot_init(context, instance)
+            instance.snapshot_committed = False
+            instance.save()            
 
     def pause(self, instance):
         """Pause VM instance."""
@@ -7270,6 +7317,10 @@ class LibvirtDriver(driver.ComputeDriver):
 
         self.power_off(instance, timeout, retry_interval)
 
+        # (TODO)Added by YuanruiFan. when user want to migrate or
+        # resize the instance, we first commit all the snapshot so
+        # that resize function can normally executed.
+
         block_device_mapping = driver.block_device_info_get_mapping(
             block_device_info)
         for vol in block_device_mapping:
@@ -7362,6 +7413,15 @@ class LibvirtDriver(driver.ComputeDriver):
         utils.execute('qemu-img', 'convert', '-f', 'qcow2',
                       '-O', 'raw', path, path_raw)
         utils.execute('mv', path_raw, path)
+
+    # Added by YuanruiFan. When the instace's power_state is 
+    # suspending or shutdown, we must use qemu-img commit
+    # to do the same thing of blockCommit.
+    # The format of image must be qcow2.
+    @staticmethod
+    def _disk_commit(top_path, base_path):
+        utils.execute('qemu-img', 'commit', '-f', 'qcow2',
+                      '-b', base_path, top_path)
 
     def _disk_resize(self, image, size):
         """Attempts to resize a disk to size
