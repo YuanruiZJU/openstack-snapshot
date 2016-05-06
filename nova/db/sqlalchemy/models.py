@@ -341,6 +341,7 @@ class Instance(BASE, NovaBase):
     # Added by YuanruiFan. We add a column 'light_snapshot_enable' for the instance and
     # to tell whether the instance allow light-snapshot
     light_snapshot_enable = Column(Boolean)
+    snapshot_committed = Column(Boolean)
 
 
 class InstanceInfoCache(BASE, NovaBase):
