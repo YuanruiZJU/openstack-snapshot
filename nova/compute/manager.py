@@ -2018,21 +2018,11 @@ class ComputeManager(manager.Manager):
 
                     
                     # Added by YuanruiFan.
-                    # If we enable light snapshot system and the instance allows
-                    # using light-snapshot system, when creating 
-                    # instance, it must first create initial external snapshots
-                    try:
-                        light_snapshot_enable = instance.light_snapshot_enable
-                    finally:
-                        instance.snapshot_committed = True
-                        instance.save()
-
-                    if (CONF.light_snapshot_enabled and \
-                        instance.light_snapshot_enable and \
-                        instance.snapshot_committed ):
-                        self.driver.light_snapshot_init(context, instance)
-                        instance.snapshot_committed = False
-                        instance.save()
+                    # When creating instance, the instance disables 
+                    # light-snapshot system by default
+                    instance.light_snapshot_enable = False 
+                    instance.snapshot_committed = True
+                    instance.save()
 
         except (exception.InstanceNotFound,
                 exception.UnexpectedDeletingTaskStateError) as e:
@@ -2641,25 +2631,19 @@ class ComputeManager(manager.Manager):
         instance.save(
             expected_task_state=[task_states.REBUILD_BLOCK_DEVICE_MAPPING])
 
+        # Added by YuanruiFan.
+        # After rebuilding the instance, we will
+        # automatically disable light-snapshot for instance
+        instance.light_snapshot_enable = False
+        instance.snapshot_committed = True
+        instance.save()
+
         with instance.mutated_migration_context():
             self.driver.spawn(context, instance, image_meta, injected_files,
                               admin_password, network_info=network_info,
                               block_device_info=new_block_device_info)
 
-        # Added by YuanruiFan.
-        # If we enable light snapshot system, when creating
-        # instance, it must first create initial external snapshots
-        try:
-            light_snapshot_enabled = instance.light_snapshot_enable
-        except:
-            instance.light_snapshot_enable = False
-            instance.snapshot_committed = True
-            instance.save()
-        if (CONF.light_snapshot_enabled and \
-            instance.light_snapshot_enable):
-            self.driver.light_snapshot_init(context, instance)
-            instance.snapshot_committed = False
-            instance.save()
+        
 
         
 
@@ -4109,6 +4093,15 @@ class ComputeManager(manager.Manager):
                         reservations, migration, instance_type,
                         clean_shutdown):
         """Starts the migration of a running instance to another host."""
+
+        # Added by YuanruiFan. Before starting resize/migration, 
+        # we check whether the instance has light-snapshot. Then
+        # we commit all the snapshots to its root disk if the instance
+        # has. 
+        if (CONF.light_snapshot_enabled and instance.light_snapshot_enable \ 
+            and (not instance.light_snapshot_committed)):
+            self.driver.commit_all_snapshots(context, instance) 
+
 
         quotas = objects.Quotas.from_reservations(context,
                                                   reservations,

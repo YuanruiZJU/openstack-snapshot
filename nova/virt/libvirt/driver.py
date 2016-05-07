@@ -1977,6 +1977,27 @@ class LibvirtDriver(driver.ComputeDriver):
                                   instance=instance)
 
 
+    # Added by YuanruiFan. We can commit all the snapshot
+    # to the root disk. This function will be called before
+    # the instance is resized/migrated/live_migrated if the
+    # instance is using our light-snapshot
+    def commit_all_snapshot(self, context, instance):
+        """commit the all snapshots to the root disk.
+        """
+
+        try:
+            guest = self._host.get_guest(instance)
+
+            # TODO(sahid): We are converting all calls from a
+            # virDomain object to use nova.virt.libvirt.Guest.
+            # We should be able to remove virt_dom at the end.
+            virt_dom = guest._domain
+        except exception.InstanceNotFound:
+            raise exception.InstanceNotRunning(instance_id=instance.uuid)
+
+        # first commit the last snapshot
+        self._commit_light_snapshot(context, instance, guest, virt_dom, commit_all=True)
+
 
 
     # Added by Yuanrui Fan. This function is used to commit the snapshot of
@@ -2746,12 +2767,6 @@ class LibvirtDriver(driver.ComputeDriver):
                                             block_device_info)
 
         xml = None
-        try:
-            light_snapshot_enable = instance.light_snapshot_enable
-        except:
-            instance.light_snapshot_enable = False
-            instance.snapshot_committed = True
-            instance.save()
 
         if (CONF.light_snapshot_enabled and \
             instance.light_snapshot_enable and \
@@ -5217,6 +5232,14 @@ class LibvirtDriver(driver.ComputeDriver):
         # Resume only if domain has been paused
         if pause:
             guest.resume()
+
+        # Added by YuanruiFan. When using light-snapshot, but snapshots are
+        # committed by users or during resize/migration/live_migration, we must
+        # create initial two external snapshot for instance.
+        if (CONF.light_snapshot_enabled and instance.light_snapshot_enable \
+            and instance.snapshot_committed):
+            self.light_snapshot_init(context, instance)
+
         return guest
 
     def _get_all_block_devices(self):
@@ -7364,10 +7387,6 @@ class LibvirtDriver(driver.ComputeDriver):
                     exception.ResizeError(reason=reason))
 
         self.power_off(instance, timeout, retry_interval)
-
-        # (TODO)Added by YuanruiFan. when user want to migrate or
-        # resize the instance, we first commit all the snapshot so
-        # that resize function can normally executed.
 
         block_device_mapping = driver.block_device_info_get_mapping(
             block_device_info)
