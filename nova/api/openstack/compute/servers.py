@@ -1091,9 +1091,6 @@ class ServersController(wsgi.Controller):
         if not instance.light_snapshot_enable:
            return
 
-        instance.light_snapshot_enable = False
-        instance.save() 
-
         try:
             self.compute_api.disable_light_snapshot(context, instance)
         except exception.InstanceNotReady as e:
