@@ -1685,8 +1685,32 @@ class LibvirtDriver(driver.ComputeDriver):
     # the instance
     def disable_light_snapshot(self, context, instance):
         
-        # First, get power state of instance
-        pass        
+        LOG.debug("disable_light_snapshot", instance=instance)
+
+        try:
+            guest = self._host.get_guest(instance)
+
+            # TODO(sahid): We are converting all calls from a
+            # virDomain object to use nova.virt.libvirt.Guest.
+            # We should be able to remove virt_dom at the end.
+            virt_dom = guest._domain
+        except exception.InstanceNotFound:
+            raise exception.InstanceNotRunning(instance_id=instance.uuid)
+
+
+        try:
+            self._commit_light_snapshot(context, instance, guest, virt_dom, commit_all=True)
+
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                LOG.exception(_LE('Error occurred during '
+                                  'disabling light snapshot for instance.'),
+                              instance=instance)
+
+        instance.light_snapshot_enable=False
+        instance.snapshot_committed = True
+        instance.save()
+
 
     # Added by Yuanrui Fan. This function is used to create a light-snapshot
     # for the instance.
@@ -1957,10 +1981,12 @@ class LibvirtDriver(driver.ComputeDriver):
 
     # Added by Yuanrui Fan. This function is used to commit the snapshot of
     # the instance.
-    def _commit_light_snapshot(self, context, instance, guest, virt_dom):
+    def _commit_light_snapshot(self, context, instance, guest, virt_dom, commit_all=False):
         """commit the last snapshot to the root disk
 
            :param instance: instance  object reference
+           :param commit_all: if True, it means commit all the snapshots to the root disk
+                              if False, only commit the last snapshot to the root disk
         """
 
         # source_format is an on-disk format
@@ -1982,8 +2008,13 @@ class LibvirtDriver(driver.ComputeDriver):
             src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
                                                                 format=source_format,
                                                                 basename=False) 
+        # All the disk except root disk will be removed
+        # after all the snapshots are committed to root disk
         disk_path_del.append(disk_path)
+
         commit_top = disk_path
+        if commit_all:
+            commit_top = current_disk_path
 
         # If the domain is active, we use libvirt's API to commit the 
         # last snapshot
@@ -2017,7 +2048,10 @@ class LibvirtDriver(driver.ComputeDriver):
                 except Exception:
                     pass
 
-                result = dev.commit(commit_base, commit_top)
+                if commit_all == False:
+                    result = dev.commit(commit_base, commit_top)
+                else:
+                    result = dev.commit_active(commit_base, commit_top) 
 
                 if result == 0:
                     LOG.debug('blockCommit started successfully',
@@ -2032,18 +2066,32 @@ class LibvirtDriver(driver.ComputeDriver):
                     dev.abort_job(pivot=True)
                 except Exception:
                     pass
-                utils.execute('rm', '-rf', commit_top)
+                if commit_all == False:
+                    utils.execute('rm', '-rf', commit_top)
+                else:
+                    for path in disk_path_del:
+                        utils.execute('rm', '-rf', path) 
+                    instance.snapshot_committed = True
+                    instance.save()
 
         else:
             LOG.info(_LI("commit snapshot for instance that is not active."),
                          instance=instance)
 
+            # if the instance is not active, we can use qemu-img to commit all
+            # the contents of snapshot to the root disk but the files must have 'w'
+            # mode for other users.
+
             self._disk_commit(current_disk_path, commit_base)
+
+            for path in disk_path_del:
+                utils.execute('rm', '-rf', path, delay_on_retry=True,
+                          attempts=5)
+            
+            # After all snapshots committed, update the snaphsot state
             instance.snapshot_committed = True
             instance.save()
 
-            for path in disk_path_del:
-                utils.execute('rm', '-rf', path) 
             LOG.info(_LI("commit snapshot successfully for instance that is not active."),
                          instance=instance)
 
@@ -7421,7 +7469,7 @@ class LibvirtDriver(driver.ComputeDriver):
     @staticmethod
     def _disk_commit(top_path, base_path):
         utils.execute('qemu-img', 'commit', '-f', 'qcow2',
-                      '-b', base_path, top_path)
+                      '-b', base_path, top_path,run_as_root=True)
 
     def _disk_resize(self, image, size):
         """Attempts to resize a disk to size

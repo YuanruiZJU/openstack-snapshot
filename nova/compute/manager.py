@@ -2024,7 +2024,6 @@ class ComputeManager(manager.Manager):
                     try:
                         light_snapshot_enable = instance.light_snapshot_enable
                     finally:
-                        instance.light_snapshot_enable = False
                         instance.snapshot_committed = True
                         instance.save()
 
@@ -3109,7 +3108,7 @@ class ComputeManager(manager.Manager):
 
 
     # Added by YuanruiFan. Disable light-snapshot system for instance.
-    def _disable_light_snapshot(context, instance, expected_task_state):
+    def _disable_light_snapshot(self, context, instance, expected_task_state):
         
         context = context.elevated()
         instance.power_state = self._get_power_state(context, instance)
