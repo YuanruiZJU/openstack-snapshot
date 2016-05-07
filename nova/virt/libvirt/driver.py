@@ -1981,7 +1981,7 @@ class LibvirtDriver(driver.ComputeDriver):
     # to the root disk. This function will be called before
     # the instance is resized/migrated/live_migrated if the
     # instance is using our light-snapshot
-    def commit_all_snapshot(self, context, instance):
+    def commit_all_snapshots(self, context, instance):
         """commit the all snapshots to the root disk.
         """
 
