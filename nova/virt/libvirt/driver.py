@@ -2818,12 +2818,6 @@ class LibvirtDriver(driver.ComputeDriver):
         timer = loopingcall.FixedIntervalLoopingCall(_wait_for_reboot)
         timer.start(interval=0.5).wait()
  
-        if (CONF.light_snapshot_enabled and \
-            instance.light_snapshot_enable and \
-            instance.snapshot_committed):
-            self.light_snapshot_init(context, instance)
-            instance.snapshot_committed = False
-            instance.save()            
 
     def pause(self, instance):
         """Pause VM instance."""
@@ -5236,8 +5230,7 @@ class LibvirtDriver(driver.ComputeDriver):
         # Added by YuanruiFan. When using light-snapshot, but snapshots are
         # committed by users or during resize/migration/live_migration, we must
         # create initial two external snapshot for instance.
-        if (CONF.light_snapshot_enabled and instance.light_snapshot_enable \
-            and instance.snapshot_committed):
+        if (CONF.light_snapshot_enabled and instance.light_snapshot_enable and instance.snapshot_committed):
             self.light_snapshot_init(context, instance)
 
         return guest

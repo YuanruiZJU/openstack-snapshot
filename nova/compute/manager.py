@@ -4098,8 +4098,7 @@ class ComputeManager(manager.Manager):
         # we check whether the instance has light-snapshot. Then
         # we commit all the snapshots to its root disk if the instance
         # has. 
-        if (CONF.light_snapshot_enabled and instance.light_snapshot_enable \ 
-            and (not instance.light_snapshot_committed)):
+        if (CONF.light_snapshot_enabled and instance.light_snapshot_enable and (not instance.light_snapshot_committed)):
             self.driver.commit_all_snapshots(context, instance) 
 
 
