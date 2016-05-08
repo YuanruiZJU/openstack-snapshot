@@ -332,6 +332,11 @@ class ServersController(wsgi.Controller):
             search_opts['deleted'] = strutils.bool_from_string(
                 search_opts['deleted'], default=False)
 
+        # Added by YuanruiFan. So that we can list the servers that
+        # use light-snapshot system.
+        if 'light_snapshot_enable' in search_opts:
+            search_opts['light_snapshot_enable'] = 1
+
         if search_opts.get("vm_state") == ['deleted']:
             if context.is_admin:
                 search_opts['deleted'] = True
@@ -1176,6 +1181,16 @@ class ServersController(wsgi.Controller):
                 'commit snapshot', id)
         except exception.Invalid as err:
             raise exc.HTTPBadRequest(explanation=err.format_message())
+
+
+    # Added by YuanruiFan. we want to light snapshot all the instances 
+    # that enable light-snapshot system.
+    @wsgi.response(202)
+    @extensions.expected_errors((400, 403, 404, 409))
+    @wsgi.action('snapshotAll')
+    def _light_snapshot_all(self, req, id, body):
+        pass
+
 
     @wsgi.response(202)
     @extensions.expected_errors((400, 403, 404, 409))

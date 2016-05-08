@@ -1320,6 +1320,15 @@ def do_image_delete(cs, args):
     action="store_true",
     default=False,
     help=_('Only display deleted servers (Admin only).'))
+
+#Added by YuanruiFan. To show instances that use light-snapshot
+@cliutils.arg(
+    '--light_snapshot_enabled',
+    dest='light_snapshot_enable',
+    action="store_true",
+    default=False,
+    help=_('Only display servers that enable light snapshot.'))
+
 @cliutils.arg(
     '--fields',
     default=None,
@@ -1380,6 +1389,7 @@ def do_list(cs, args):
         'user_id': args.user,
         'host': args.host,
         'deleted': args.deleted,
+        'light_snapshot_enable': args.light_snapshot_enable,
         'instance_name': args.instance_name}
 
     filters = {'flavor': lambda f: f['id'],
@@ -1830,6 +1840,11 @@ def do_disable_light_snapshot(cs, args):
     server = _find_server(cs, args.server)
     cs.servers.disable_light_snapshot(server)
 
+
+# Added by YuanruiFan. We light snapshot all the instances that
+# enable light-snapshot system.
+def do_light_snapshots_all(cs, args):
+    cs.servers.light_snapshot_all()
 
 
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))

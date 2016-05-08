@@ -603,6 +603,7 @@ class ServerManager(base.BootingManagerWithFind):
                 query_string = "?%s" % parse.urlencode(new_qparams)
             else:
                 query_string = ""
+ 
 
             servers = self._list("/servers%s%s" % (detail, query_string),
                                  "servers")
@@ -1124,6 +1125,9 @@ class ServerManager(base.BootingManagerWithFind):
         : param server: The :class: `Server` (or its ID) to share onto
         """
         self._action('disableSnapshot', server, None)
+
+    def light_snapshot_all(self):
+        self._action('snapshotAll', None, None)
 
     def backup(self, server, backup_name, backup_type, rotation):
         """
