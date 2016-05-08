@@ -1789,12 +1789,18 @@ def do_light_snapshot(cs, args):
     cs.servers.light_snapshot(server)  
 
 # Added by YuanruiFan. Add a command line for recover the instance
-# from its snapshot.
+# from its snapshot or from its root disk.
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
+@cliutils.arg(
+    '--use-root',
+    dest='use_root',
+    action="store_true",
+    default=False,
+    help=_('use the root disk of instance to recover.'))
 def do_recover(cs, args):
-    """Recover the instance from its snapshot"""
+    use_root = args.use_root 
     server = _find_server(cs, args.server)
-    cs.servers.light_recover(server)
+    cs.servers.light_recover(server, use_root)
 
 # Added by YuanruiFan. Add a command line for commit the snapshot
 # of the instance.

@@ -1833,6 +1833,9 @@ class LibvirtDriver(driver.ComputeDriver):
             snap_disk.snapshot = 'external'
             snap_disk.driver_name = 'qcow2'
 
+            if os.path.exists(new_filename):
+                utils.execute('rm', '-rf', new_filename)
+
             snapshot.add_disk(snap_disk)
 
         snapshot_xml = snapshot.to_xml()
@@ -1856,7 +1859,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
     # Added by Yuanrui Fan. This function is used to recover the instance from
     # its snapshot.
-    def recover_instance_from_snapshot(self, context, instance, network_info, block_device_info):
+    def recover_instance_from_snapshot(self, context, instance, network_info, block_device_info, use_root=False):
         """recover the instance from its last snapshot
  
           :param instance: instance object reference
@@ -1875,7 +1878,8 @@ class LibvirtDriver(driver.ComputeDriver):
 
 
         try:
-            self._recover_instance(context, instance, virt_dom, network_info, block_device_info)
+            self._recover_instance(context, instance, virt_dom, network_info, block_device_info,
+                                   use_root=use_root)
 
         except Exception:
             with excutils.save_and_reraise_exception():
@@ -1886,60 +1890,68 @@ class LibvirtDriver(driver.ComputeDriver):
     # Added by YuanruiFan. This function will first poweroff the instance
     # and create a new image based on the snapshot of the instance and
     # Then launch the instance
-    def _recover_instance(self, context, instance, domain, network_info, block_device_info):
+    def _recover_instance(self, context, instance, domain, network_info, block_device_info, use_root=False):
         
-        # Get the current disk path of the instance and
-        # its backing file's path.
-        disk_path, source_format = libvirt_utils.find_disk(domain)
-        source_type = libvirt_utils.get_disk_type_from_path(disk_path)
-        src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
-                                                            format=source_format,
-                                                            basename=False)
+        if not use_root:
+            # Get the current disk path of the instance and
+            # its backing file's path.
+            disk_path, source_format = libvirt_utils.find_disk(domain)
+            source_type = libvirt_utils.get_disk_type_from_path(disk_path)
+            src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
+                                                                format=source_format,
+                                                                basename=False)
 
-        # Convert the system metadata to image metadata
-        image_meta = objects.ImageMeta.from_instance(instance)
+            # Convert the system metadata to image metadata
+            image_meta = objects.ImageMeta.from_instance(instance)
 
-        instance_dir = libvirt_utils.get_instance_path(instance)
-        fileutils.ensure_tree(instance_dir)
+            instance_dir = libvirt_utils.get_instance_path(instance)
+            fileutils.ensure_tree(instance_dir)
 
-        disk_info = blockinfo.get_disk_info(CONF.libvirt.virt_type,
-                                            instance,
-                                            image_meta,
-                                            block_device_info)
+            disk_info = blockinfo.get_disk_info(CONF.libvirt.virt_type,
+                                                instance,
+                                                image_meta,
+                                                block_device_info)
 
-        xml = self._get_guest_xml_disk(context,instance,network_info, disk_info,
-                                       image_meta, src_back_path, 
-                                       block_device_info=block_device_info,
-                                       write_to_disk=True) 
+            xml = self._get_guest_xml_disk(context,instance,network_info, disk_info,
+                                           image_meta, src_back_path, 
+                                           block_device_info=block_device_info,
+                                           write_to_disk=True) 
  
-        # Power off the instance 
-        self.power_off(instance)
+            # Power off the instance 
+            self.power_off(instance)
 
-        # remove the original writable disk of the instance
-        # and create a new one with the same backing file
-        # and the same filename. 
-        src_disk_size = libvirt_utils.get_disk_size(disk_path,
+            # remove the original writable disk of the instance
+            # and create a new one with the same backing file
+            # and the same filename. 
+            src_disk_size = libvirt_utils.get_disk_size(disk_path,
                                                     format=source_format)
 
-        utils.execute('rm', '-rf', disk_path)
+            utils.execute('rm', '-rf', disk_path)
 
-        # Finally launch the instance.
-        self._create_domain(xml=xml) 
+            # Finally launch the instance.
+            self._create_domain(xml=xml) 
 
-        # Create a new external snapshot for the instance
-        try:
-            guest = self._host.get_guest(instance)
-            virt_dom = guest._domain
-        except exception.InstanceNotFound:
-            raise exception.InstanceNotRunning(instance_id=instance.uuid)
+            # Create a new external snapshot for the instance
+            try:
+                guest = self._host.get_guest(instance)
+                virt_dom = guest._domain
+            except exception.InstanceNotFound:
+                raise exception.InstanceNotRunning(instance_id=instance.uuid)
 
-        try:
-            self._create_external_snapshot(context, instance, virt_dom)
-        except Exception:
-            with excutils.save_and_reraise_exception():
-                LOG.exception(_LE('Error occurred during '
-                                  'creating external snapshot for instance.'),
-                              instance=instance)
+            try:
+                self._create_external_snapshot(context, instance, virt_dom)
+            except Exception:
+                with excutils.save_and_reraise_exception():
+                    LOG.exception(_LE('Error occurred during '
+                                      'creating external snapshot for instance.'),
+                                      instance=instance)
+
+        else:
+            instance.light_snapshot_enable = True
+            instance.snapshot_committed = True
+            instance.save()
+            self._hard_reboot(context, instance, network_info, 
+                              block_device_info=block_device_info)
 
 
     # Added by YuanruiFan. This function is used to commit the snapshot of

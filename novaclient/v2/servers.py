@@ -1098,11 +1098,12 @@ class ServerManager(base.BootingManagerWithFind):
         """ 
         self._action('createSnapshot', server, None)
  
-    def light_recover(self, server):
+    def light_recover(self, server, use_root):
         """ recover the instance from its snapshot
         : param server: The :class: `Server` (or its ID) to share onto
         """
-        self._action('recoverInstance', server, None)
+        body = {'use_root': use_root}
+        self._action('recoverInstance', server, body)
 
     def light_commit(self, server):
         """ commit the snapshot to the root disk

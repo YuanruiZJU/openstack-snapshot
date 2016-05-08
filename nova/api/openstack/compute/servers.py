@@ -1137,9 +1137,13 @@ class ServersController(wsgi.Controller):
         context = req.environ['nova.context']
         instance = self._get_instance(context, id)
         authorize(context, instance, 'recover_instance')
+
+        entity = body["recoverInstance"]
+        use_root = entity["use_root"]
+
         LOG.debug('recover the instance from its snapshot', instance=instance)
         try:
-            self.compute_api.light_recover(context, instance)
+            self.compute_api.light_recover(context, instance, use_root=use_root)
         except exception.InstanceNotReady as e:
             raise webob.exc.HTTPConflict(explanation=e.format_message())
         except exception.InstanceUnknownCell as e:

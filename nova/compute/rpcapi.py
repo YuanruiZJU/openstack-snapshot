@@ -786,12 +786,12 @@ class ComputeAPI(object):
         cctxt.cast(ctxt, 'light_snapshot_instance',
                    instance=instance)
 
-    def light_recover_instance(self, ctxt, instance):
+    def light_recover_instance(self, ctxt, instance, use_root=False):
         version = '4.0'
         cctxt = self.client.prepare(server=_compute_host(None, instance),
                 version=version)
         cctxt.cast(ctxt, 'light_recover_instance',
-                   instance=instance)
+                   instance=instance, use_root=use_root)
 
 
     def light_commit_snapshot(self, ctxt, instance):
