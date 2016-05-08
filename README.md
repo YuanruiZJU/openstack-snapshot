@@ -8,13 +8,13 @@
 主要是在nova数据库的instances表中增加两列：
 
 ```
-mysql -u root -p password
+# mysql -u root -p password
 
-use nova
+MariaDB [(none)]> use nova
 
-alter table instances add column light_snapshot_enable tinyint(1);
+MariaDB [nova]> alter table instances add column light_snapshot_enable tinyint(1);
 
-alter table instances add column snapshot_committed tinyint(1);
+MariaDB [nova]> alter table instances add column snapshot_committed tinyint(1);
 
 ```
 
