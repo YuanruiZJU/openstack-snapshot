@@ -2077,14 +2077,10 @@ class LibvirtDriver(driver.ComputeDriver):
 
                 # Abort is an idempotent operation, so make sure any block
                 # jobs which may have failed are ended.
-                count = 0
-                while count < retry_count:
-                    try:
-                        dev.abort_job()
-                        break
-                    except Exception:
-                        count += 1
-                    
+                try:
+                    dev.abort_job()
+                except Exception:
+                    pass 
 
                 if commit_all == False:
                     result = dev.commit(commit_base, commit_top)
@@ -2100,22 +2096,25 @@ class LibvirtDriver(driver.ComputeDriver):
                               instance=instance)
                     time.sleep(0.5)
 
-                count = 0
-                while count < retry_count:
+                if cmmit_all == False:
                     try:
                         dev.abort_job(pivot=True)
-                        if commit_all == False:
-                            utils.execute('rm', '-rf', commit_top)
-                        else:
+                    except Exception:
+                        pass
+                    utils.execute('rm', '-rf', commit_top)
+                else:
+                    count = 0
+                    while count < retry_count:
+                        try:
+                            dev.abort_job(pivot=True)
                             for path in disk_path_del:
                                 utils.execute('rm', '-rf', path)
                             instance.snapshot_committed = True
                             instance.save()
-
-                        break
-                    except Exception:
-                        count += 1
-                        time.sleep(0.5)
+                            break
+                        except Exception:
+                            count += 1
+                            time.sleep(0.5)
 
         else:
             LOG.info(_LI("commit snapshot for instance that is not active."),
