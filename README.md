@@ -1,7 +1,11 @@
 # openstack-snapshot
 该项目主要是向OpenStack中引入libvirt的磁盘外部快照功能。便于虚拟机出现问题、数据损坏时，从外部快照恢复。
 适用于openstack的liberty版本。
-使用时，只要直接将文件的对应的路径覆盖即可。
+
+使用时，用户首先按照官方文档，安装L版本的OpenStack。然后直接将文件的对应的路径覆盖即可，相关命令如下：
+```
+# cp -r openstack-snapshot/dist-packages/* /usr/lib/python2.7/dist-packages/
+```
 
 * 为了正常使用light-snapshot系统的功能，需要修改数据库中相关表。
   主要是在nova数据库的instances表中增加两列：
