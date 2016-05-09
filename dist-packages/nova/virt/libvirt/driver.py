@@ -2030,6 +2030,7 @@ class LibvirtDriver(driver.ComputeDriver):
                                                             format=source_format,
                                                             basename=False)
 
+        retry_count = 5
         state = guest.get_power_state(self._host)
 
         current_disk_path = disk_path
@@ -2076,10 +2077,14 @@ class LibvirtDriver(driver.ComputeDriver):
 
                 # Abort is an idempotent operation, so make sure any block
                 # jobs which may have failed are ended.
-                try:
-                    dev.abort_job()
-                except Exception:
-                    pass
+                count = 0
+                while count < retry_count:
+                    try:
+                        dev.abort_job()
+                        break
+                    except Exception:
+                        count += 1
+                    
 
                 if commit_all == False:
                     result = dev.commit(commit_base, commit_top)
@@ -2095,17 +2100,22 @@ class LibvirtDriver(driver.ComputeDriver):
                               instance=instance)
                     time.sleep(0.5)
 
-                try:
-                    dev.abort_job(pivot=True)
-                except Exception:
-                    pass
-                if commit_all == False:
-                    utils.execute('rm', '-rf', commit_top)
-                else:
-                    for path in disk_path_del:
-                        utils.execute('rm', '-rf', path) 
-                    instance.snapshot_committed = True
-                    instance.save()
+                count = 0
+                while count < retry_count:
+                    try:
+                        dev.abort_job(pivot=True)
+                        if commit_all == False:
+                            utils.execute('rm', '-rf', commit_top)
+                        else:
+                            for path in disk_path_del:
+                                utils.execute('rm', '-rf', path)
+                            instance.snapshot_committed = True
+                            instance.save()
+
+                        break
+                    except Exception:
+                        count += 1
+                        time.sleep(0.5)
 
         else:
             LOG.info(_LI("commit snapshot for instance that is not active."),
