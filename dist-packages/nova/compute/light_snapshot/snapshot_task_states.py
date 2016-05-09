@@ -29,7 +29,7 @@ VM_COMMITING = "committing"
 
 VM_DELETE_SNAPSHOT = "vm_delete_snapshot"
 
-VM_RECOVER_FROM_SNAPSHOT = "recovering"
 VM_RECOVER_START = "recover_start"
+VM_RECOVER_FROM_SNAPSHOT = "recovering"
 
-DISABLE_SNAPSHOT="disabling_snapshot"
+DISABLE_SNAPSHOT = "disabling_light_snapshot"
