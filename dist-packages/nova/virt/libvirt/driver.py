@@ -2096,7 +2096,7 @@ class LibvirtDriver(driver.ComputeDriver):
                               instance=instance)
                     time.sleep(0.5)
 
-                if cmmit_all == False:
+                if commit_all == False:
                     try:
                         dev.abort_job(pivot=True)
                     except Exception:
