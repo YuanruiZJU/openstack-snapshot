@@ -5244,6 +5244,8 @@ class LibvirtDriver(driver.ComputeDriver):
         # create initial two external snapshot for instance.
         if (CONF.light_snapshot_enabled and instance.light_snapshot_enable and instance.snapshot_committed):
             self.light_snapshot_init(context, instance)
+            instance.snapshot_committed = False
+            instance.save()
 
         return guest
 

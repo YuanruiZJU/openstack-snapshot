@@ -3275,13 +3275,13 @@ class ComputeManager(manager.Manager):
                     continue
 
                 # For all the instance that to snapshot, first update their task_state
-                if (CONF.light_snapshot_enabled and instance.light_snapshot_enable and (not instance.light_snapshot_committed)):
+                if (CONF.light_snapshot_enabled and instance.light_snapshot_enable and (not instance.snapshot_committed)):
                     instance.task_state = snapshot_task_states.VM_SNAPSHOT_PENDING
                     instance.save(expected_task_state=[None])
                     self.light_snapshot_instance(context, instance)
             except Exception as error:
                 LOG.exception(_LE("Error trying to light_snapshot."),
-                              instance_uuid=instance_uuid)
+                              instance=instance)
                 compute_utils.add_instance_fault_from_exc(context,
                                                           instance, error,
                                                           exc_info=sys.exc_info())
