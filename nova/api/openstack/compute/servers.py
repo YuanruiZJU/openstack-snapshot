@@ -1189,7 +1189,19 @@ class ServersController(wsgi.Controller):
     @extensions.expected_errors((400, 403, 404, 409))
     @wsgi.action('snapshotAll')
     def _light_snapshot_all(self, req, id, body):
-        pass
+        """
+           With this function, you can snapshot all instances 
+           that enable light snapshot.
+        """
+        context = req.environ['nova.context']
+        authorize(context, action='light_snapshot_all')
+        LOG.debug('Light snapshot all the instances that enable light-snapshot.')
+ 
+        host_api = compute.HostAPI() 
+        compute_nodes = host_api.compute_node_get_all(context) 
+        for node in compute_nodes:
+            host = node.hypervisor_hostname
+            self.compute_api.light_snapshot_all(context, host)
 
 
     @wsgi.response(202)

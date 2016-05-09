@@ -1843,7 +1843,7 @@ def do_disable_light_snapshot(cs, args):
 
 # Added by YuanruiFan. We light snapshot all the instances that
 # enable light-snapshot system.
-def do_light_snapshots_all(cs, args):
+def do_light_snapshot_all(cs, args):
     cs.servers.light_snapshot_all()
 
 

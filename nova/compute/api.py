@@ -2284,6 +2284,14 @@ class API(base.Base):
 
         self.compute_rpcapi.light_snapshot_instance(context, instance)
 
+    @wrap_check_policy
+    def light_snapshot_all(self, context, host):
+        """Take an external(light) snapshot for the given instance.
+        
+        :param instance: nova.objects.instance.Instance object
+        """
+        self.compute_rpcapi.light_snapshot_all(context, host)
+
     
     # Added by YuanruiFan. To recover the instance from its snapshot.
     # We do not check instance lock for snapshot because lock is

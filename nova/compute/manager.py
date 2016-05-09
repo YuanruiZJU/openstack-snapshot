@@ -3253,7 +3253,41 @@ class ComputeManager(manager.Manager):
             msg = 'Instance disappeared during recovering the instance'
             LOG.debug(msg, instance=instance)
         
- 
+    # Added by YuanruiFan. To snapshot all the instance in the host.
+    @wrap_exception()
+    def light_snapshot_all(self, context):
+        """With light-snapshot system, you can snapshot an instance without so 
+           much time. So users may want to snapshot all the instances when few people
+           are using instances. So that the state of all the instances can be stored.
+        """
+        context = context.elevated()
+
+        # Get all instances on this host.
+        local_instances =self._get_instances_on_driver(context)
+
+        for instance in local_instances:
+            instance.power_state = self._get_power_state(context, instance)
+            try:
+                instance.save()
+
+                # if instance is not running, we do not snapshot it.
+                if instance.power_state != power_state.RUNNING:
+                    continue
+
+                # For all the instance that to snapshot, first update their task_state
+                if (CONF.light_snapshot_enabled and instance.light_snapshot_enable and (not instance.light_snapshot_committed)):
+                    instance.task_state = snapshot_task_states.VM_SNAPSHOT_PENDING
+                    instance.save(expected_task_state=[None])
+                    self.light_snapshot_instance(context, instance)
+            except Exception as error:
+                LOG.exception(_LE("Error trying to light_snapshot."),
+                              instance_uuid=instance_uuid)
+                compute_utils.add_instance_fault_from_exc(context,
+                                                          instance, error,
+                                                          exc_info=sys.exc_info())
+                self._notify_about_instance_usage(context, instance,
+                                                  'light_snapshot.error', fault=error) 
+
 
     # Added by YuanruiFan. To commit the last external snapshot.
     @wrap_exception()
