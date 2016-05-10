@@ -183,13 +183,13 @@ class ToggleEnableLightSnapshot(tables.BatchAction):
     def action_present(count):
         return (
             ungettext_lazy(
-                u"Enable Light-snapshot",
-                u"Enable Light-snapshot",
+                u"Disable Light-snapshot",
+                u"Disable Light-snapshot",
                 count
             ),
             ungettext_lazy(
-                u"Disable Light-snapshot",
-                u"Disable Light-snapshot",
+                u"Enable Light-snapshot",
+                u"Enable Light-snapshot",
                 count
             ),
         )
@@ -198,13 +198,13 @@ class ToggleEnableLightSnapshot(tables.BatchAction):
     def action_past(count):
         return (
             ungettext_lazy(
-                u"Enabled Light-snapshot",
-                u"Enabled Light-snapshot",
+                u"Disabled Light-snapshot",
+                u"Disabled Light-snapshot",
                 count
             ),
             ungettext_lazy(
-                u"Disabled Light-snapshot",
-                u"Disabled Light-snapshot",
+                u"Enabled Light-snapshot",
+                u"Enabled Light-snapshot",
                 count
             ),
         )
@@ -215,14 +215,34 @@ class ToggleEnableLightSnapshot(tables.BatchAction):
             return False
         if not instance:
             return False
+
+        self.light_snapshot_enabled = instance.light_snapshot_enabled
+        if self.light_snapshot_enabled:
+            self.current_present_action = DISABLE_LIGHT_SNAPSHOT
+            policy = (("compute", "compute_extension:admin_actions:disable_light_snapshot"),)
+        else:
+            self.current_present_action = ENABLE_LIGHT_SNAPSHOT
+            policy = (("compute", "compute_extension:admin_actions:enable_light_snapshot"),)
+
         has_permission = True
+        policy_check = getattr(settings, "POLICY_CHECK_FUNCTION", None)
+        if policy_check:
+            has_permission = policy_check(
+                policy, request,
+                target={'project_id': getattr(instance, 'tenant_id', None)})
 
         return (has_permission
+                and (instance.status in ACTIVE_STATES)
                 and not is_deleting(instance))
 
+
     def action(self, request, obj_id):
-        api.nova.server_enable_light_snapshot(request, obj_id)
-        self.current_past_action = ENABLE_LIGHT_SNAPSHOT
+        if self.light_snapshot_enabled:
+            api.nova.server_disable_light_snapshot(request, obj_id)
+            self.current_past_action = DISABLE_LIGHT_SNAPSHOT
+        else:
+            api.nova.server_enable_light_snapshot(request, obj_id)
+            self.current_past_action = ENABLE_LIGHT_SNAPSHOT
 
 
 class TogglePause(tables.BatchAction):
