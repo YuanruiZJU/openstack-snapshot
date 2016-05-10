@@ -93,6 +93,9 @@ class Server(base.APIResourceWrapper):
               'metadata', 'name', 'private_ip', 'public_ip', 'status', 'uuid',
               'image_name', 'VirtualInterfaces', 'flavor', 'key_name', 'fault',
               'tenant_id', 'user_id', 'created', 
+              # Added by YuanruiFan. So that dashboard can know whether
+              # the instance enabled light-snapshot
+              'light_snapshot_enabled',
               'OS-EXT-STS:power_state',
               'OS-EXT-STS:task_state', 'OS-EXT-SRV-ATTR:instance_name',
               'OS-EXT-SRV-ATTR:host', 'OS-EXT-AZ:availability_zone',
@@ -642,6 +645,12 @@ def server_pause(request, instance_id):
 def server_unpause(request, instance_id):
     novaclient(request).servers.unpause(instance_id)
 
+# Added by YuanruiFan. To call the light-snapshot system API.
+def server_enable_light_snapshot(request, instance_id):
+    novaclient(request).servers.enable_light_snapshot(instance_id, None)
+
+def server_disable_light_snapshot(request, instance_id):
+    novaclient(request).servers.disable_light_snapshot(instance_id)
 
 def server_suspend(request, instance_id):
     novaclient(request).servers.suspend(instance_id)
