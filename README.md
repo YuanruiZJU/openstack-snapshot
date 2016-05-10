@@ -18,14 +18,11 @@ MariaDB [nova]> alter table instances add column light_snapshot_enable tinyint(1
 
 MariaDB [nova]> alter table instances add column snapshot_committed tinyint(1);
 
-MariaDB [nova]> alter table instances add column snapshot_store tinyint(1);
 
 ```
 增加`light_snapshot_enable`，这样，我们可以规定哪些虚拟机可以使用我们的快照系统，哪些不可以或者不用使用我们的快照系统，以便在编码中对虚拟机进行分情况管理。
 
 增加`snapshot_committed`，主要是因为，当虚拟机进行冷迁移、热迁移、resize都操作时，都需要先把全部的snapshot磁盘commit回root disk，最后再次创建虚拟机的时候，可以根据`light_snapshot_enable`和`snapshot_committed`，在开机的时候，判断是否需要做light-snapshot系统的初始化工作。
-
-增加`snapshot_store`, 这样，当我们需要储存虚拟机的全部快照时，我们可以对所有产生的快照文件都保存在每个虚拟机的snapshots文件夹下，而不是将快照文件直接删除，这样，用户就可以通过我们保存的快照恢复到任何一个时间点。但是这样恢复的时间会比较漫长，需要进行大量增量快照的合并工作。当用户需要将一个虚拟机纳入我们的light-snapshot系统中时，可以在运行enable-light-snapshot命令时选择--snapshot-store选项，选择该选项将保证虚拟机的全部快照都会保存下来，但是在虚拟机的迁移、resize也需要把它们都复制到目标物理机上。
 
 当更改完数据库之后，需要将nova的服务全部重启之后，使更改的数据库有效:
 ```
