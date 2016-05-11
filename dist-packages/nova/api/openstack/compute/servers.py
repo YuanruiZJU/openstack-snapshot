@@ -1055,6 +1055,29 @@ class ServersController(wsgi.Controller):
         robj = wsgi.ResponseObject(view)
         return self._add_location(robj)
 
+    # Added by YuanruiFan. To enable daily snapshot for an instance.
+    @wsgi.response(202)
+    @extensions.expected_errors((400, 403, 404, 409))
+    @wsgi.action('dailySnapshot')
+    def _enable_daily_snapshot(self, req, id, body):
+        """Enable daily light-snapshot for an instance."""
+        context = req.environ['nova.context']
+        instance = self._get_instance(context, id)
+        authorize(context, instance, 'enable_daily_snapshot')
+        LOG.debug('enable daily snapshot.', instance=instance)
+
+        if instance.snapshot_daily:
+            return
+
+        if instance.light_snapshot_enable:
+            instance.snapshot_daily = True
+            instance.save()
+        else:
+            msg = _('The instance has not enabled light-snapshot.')
+            raise webob.exc.HTTPConflict(explanation=e.format_message()) 
+
+
+
     # Added by YuanruiFan. To enable a server to use light-snapshot system.
     @wsgi.response(202)
     @extensions.expected_errors((400, 403, 404, 409))
@@ -1066,7 +1089,6 @@ class ServersController(wsgi.Controller):
         authorize(context, instance, 'enable_light_snapshot')
         LOG.debug('enable the instance to use light-snasphot system', instance=instance)
 
-        
         if instance.light_snapshot_enable:
             return
 
