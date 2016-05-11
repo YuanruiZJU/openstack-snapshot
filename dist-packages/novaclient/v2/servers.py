@@ -1113,12 +1113,11 @@ class ServerManager(base.BootingManagerWithFind):
         self._action('commitSnapshot', server, None)
 
 
-    def enable_light_snapshot(self, server, daily, snapshot_store=False):
+    def enable_light_snapshot(self, server, daily):
         """ Enable light-snapshot system for a server.
         : param server: The :class: `Server` (or its ID) to share onto
         """
-        body = {'daily':daily,
-                'snashot_store': snapshot_store}
+        body = {'daily':daily}
         self._action('enableSnapshot', server, body)
 
     def disable_light_snapshot(self, server):
