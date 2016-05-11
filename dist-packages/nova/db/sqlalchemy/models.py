@@ -342,6 +342,10 @@ class Instance(BASE, NovaBase):
     # to tell whether the instance allow light-snapshot
     light_snapshot_enable = Column(Boolean)
     snapshot_committed = Column(Boolean)
+    snapshot_index = Column(Integer)
+    root_index = Column(Integer)
+    snapshot_store = Column(Boolean)
+    snapshot_daily = Column(Boolean)    
 
 
 class InstanceInfoCache(BASE, NovaBase):
