@@ -198,13 +198,13 @@ class ToggleEnableLightSnapshot(tables.BatchAction):
     def action_past(count):
         return (
             ungettext_lazy(
-                u"Disabled Light-snapshot",
-                u"Disabled Light-snapshot",
+                u"Disable Light-snapshot for instance Successfully",
+                u"Disable Light-snapshot for instances Successfully",
                 count
             ),
             ungettext_lazy(
-                u"Enabled Light-snapshot",
-                u"Enabled Light-snapshot",
+                u"Enable Light-snapshot for instance Successfully",
+                u"Enable Light-snapshot for instances Successfully",
                 count
             ),
         )
@@ -232,7 +232,7 @@ class ToggleEnableLightSnapshot(tables.BatchAction):
                 target={'project_id': getattr(instance, 'tenant_id', None)})
 
         return (has_permission
-                and (instance.status in ACTIVE_STATES)
+                and (instance.status in ACTIVE_STATES or self.light_snapshot_enabled)
                 and not is_deleting(instance))
 
 
@@ -1045,6 +1045,17 @@ def get_keyname(instance):
         return keyname
     return _("Not available")
 
+# Added by YuanruiFan. To know whether the 
+# instance enable light-snapshot.
+def get_light_snapshot_enabled(instance):
+    ret_str = "disabled"
+    if hasattr(instance, "light_snapshot_enabled"):
+        light_snapshot_enabled = instance.light_snapshot_enabled
+        if light_snapshot_enabled:
+            ret_str = "enabled"
+        else:
+            ret_str = "disabled"
+    return ret_str    
 
 def get_power_state(instance):
     return POWER_STATES.get(getattr(instance, "OS-EXT-STS:power_state", 0), '')
@@ -1208,6 +1219,8 @@ class InstancesTable(tables.DataTable):
                        attrs={'data-type': "ip"})
     size = tables.Column(get_size, sortable=False, verbose_name=_("Size"))
     keypair = tables.Column(get_keyname, verbose_name=_("Key Pair"))
+    # Add a column to show whether the instance enable light-snapshot
+    light_snapshot_enabled = tables.Column(get_light_snapshot_enabled, verbose_name=_("Light-Snapshot"))
     status = tables.Column("status",
                            filters=(title, filters.replace_underscores),
                            verbose_name=_("Status"),
@@ -1231,6 +1244,7 @@ class InstancesTable(tables.DataTable):
                             filters=(filters.parse_isotime,
                                      filters.timesince_sortable),
                             attrs={'data-type': 'timesince'})
+
 
     class Meta(object):
         name = "instances"

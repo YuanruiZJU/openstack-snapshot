@@ -3037,6 +3037,23 @@ class ComputeManager(manager.Manager):
     @wrap_instance_fault
     def enable_light_snapshot(self, context, instance):
         try:
+            instance.task_state = snapshot_task_states.ENABLE_SNAPSHOT
+            instance.save(expected_task_state=[None])
+
+        except exception.InstanceNotFound:
+            # possibility instance no longer exists, no point in continuing
+            LOG.debug("Instance not found, could not set state %s "
+                      "for instance.",
+                      snapshot_task_states.ENABLE_SNAPSHOT, instance=instance)
+            return
+
+        except exception.UnexpectedDeletingTaskStateError:
+            LOG.debug("Instance being deleted, enabling light-snapshot cannot continue",
+                      instance=instance)
+            return
+
+
+        try:
             LOG.info(_LI('Enable light-snapshot system for instance'), context=context,
                   instance=instance)
 
@@ -3049,6 +3066,9 @@ class ComputeManager(manager.Manager):
             instance.light_snapshot_enable = True
             instance.snapshot_committed = False
             instance.save()
+
+            instance.task_state = None
+            instance.save(expected_task_state=snapshot_task_states.ENABLE_SNAPSHOT)
 
             self._notify_about_instance_usage(context, instance,
                                               "enable_light_snapshot.end")
@@ -3072,7 +3092,7 @@ class ComputeManager(manager.Manager):
         """ 
         try:
             instance.task_state = snapshot_task_states.DISABLE_SNAPSHOT
-            instance.save()
+            instance.save(expected_task_state=[None])
 
 
         except exception.InstanceNotFound:
@@ -3083,7 +3103,7 @@ class ComputeManager(manager.Manager):
             return
 
         except exception.UnexpectedDeletingTaskStateError:
-            LOG.debug("Instance being deleted, snapshot cannot continue",
+            LOG.debug("Instance being deleted, disabling light-snapshot cannot continue",
                       instance=instance)
             return
 
@@ -4550,6 +4570,7 @@ class ComputeManager(manager.Manager):
         if CONF.shelved_offload_time == 0:
             instance.task_state = task_states.SHELVING_OFFLOADING
         instance.power_state = self._get_power_state(context, instance)
+        instance.snapshot_committed = True
         instance.save(expected_task_state=[
                 task_states.SHELVING,
                 task_states.SHELVING_IMAGE_UPLOADING])
