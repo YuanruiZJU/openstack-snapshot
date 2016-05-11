@@ -647,7 +647,7 @@ def server_unpause(request, instance_id):
 
 # Added by YuanruiFan. To call the light-snapshot system API.
 def server_enable_light_snapshot(request, instance_id):
-    novaclient(request).servers.enable_light_snapshot(instance_id, None)
+    novaclient(request).servers.enable_light_snapshot(instance_id)
 
 def server_disable_light_snapshot(request, instance_id):
     novaclient(request).servers.disable_light_snapshot(instance_id)
