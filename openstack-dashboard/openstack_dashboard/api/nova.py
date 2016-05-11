@@ -656,7 +656,7 @@ def server_light_snapshot(request, instance_id):
     novaclient(request).servers.light_snapshot(instance_id)
 
 def server_recover(request, instance_id):
-    novaclient(request).servers.light_recover(instance, None)
+    novaclient(request).servers.light_recover(instance_id, None)
 
 def server_suspend(request, instance_id):
     novaclient(request).servers.suspend(instance_id)

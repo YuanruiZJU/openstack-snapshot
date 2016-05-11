@@ -246,9 +246,45 @@ class ToggleEnableLightSnapshot(tables.BatchAction):
             api.nova.server_enable_light_snapshot(request, obj_id)
             self.current_past_action = ENABLE_LIGHT_SNAPSHOT
 
+# Added by YuanruiFan. Add a button to recover instance
+class RecoverInstance(policy.PolicyTargetMixin, tables.BatchAction):
+    name = "recover_snapshot"
+    classes = ('btn-danger', 'btn-recover')
+    policy_rules = (("compute", "compute:recover"),)
+    help_text = _("Recover Instance will reboot from the last snapshot.")
+
+    @staticmethod
+    def action_present(count):
+        return ungettext_lazy(
+            u"Recover Instance",
+            u"Recover Instances",
+            count
+        )
+
+    @staticmethod
+    def action_past(count):
+        return ungettext_lazy(
+            u"Recover Instance Successfully",
+            u"Recover Instances Successfully",
+            count
+        )
+
+    def allowed(self, request, instance=None):
+        if instance is not None:
+            return ((instance.status in ACTIVE_STATES)
+                    and instance.light_snapshot_enabled
+                    and not is_deleting(instance))
+        else:
+            return False
+
+    def action(self, request, obj_id):
+        api.nova.server_recover(request, obj_id)
+
+
 # Added by YuanruiFan. Add a button for light-snapshot
 class LightSnapshotInstance(policy.PolicyTargetMixin, tables.BatchAction):
     name = "light_snapshot"
+    
     policy_rules = (("compute", "compute:light_snapshot"),)
     help_text = _("light-snapshot will save your data as snapshot.")
 
@@ -278,7 +314,6 @@ class LightSnapshotInstance(policy.PolicyTargetMixin, tables.BatchAction):
 
     def action(self, request, obj_id):
         api.nova.server_light_snapshot(request, obj_id)
-
 
 
 class TogglePause(tables.BatchAction):
@@ -1301,7 +1336,7 @@ class InstancesTable(tables.DataTable):
                        DetachInterface, EditInstance,
                        DecryptInstancePassword, EditInstanceSecurityGroups,
                        ConsoleLink, LogLink, TogglePause, ToggleSuspend,
-                       ToggleShelve, ToggleEnableLightSnapshot,  LightSnapshotInstance,
+                       ToggleShelve, ToggleEnableLightSnapshot,  LightSnapshotInstance, RecoverInstance,
                        ResizeLink, LockInstance, UnlockInstance,
                        SoftRebootInstance, RebootInstance,
                        StopInstance, RebuildInstance, TerminateInstance)
