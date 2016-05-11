@@ -1778,6 +1778,13 @@ class LibvirtDriver(driver.ComputeDriver):
 
         disks_to_snap = []          # to be snapshotted by libvirt
 
+        # Get the snapshot index from database
+        snapshot_index = instance.snapshot_index
+        if (snapshot_index is None):
+            snapshot_index = 0
+        else:
+            snapshot_index += 1
+
         for guest_disk in device_info.devices:
             if (guest_disk.root_name != 'disk'):
                 continue
@@ -1799,25 +1806,15 @@ class LibvirtDriver(driver.ComputeDriver):
             
             current_file = disk_info['current_file']
             current_filename = current_file.split('/')[-1]
-            if current_filename == 'disk':
-                new_file = os.path.join(os.path.dirname(current_file), 'disk_snap0')
-            elif len(current_filename) > 9 and current_filename[0:9] == 'disk_snap' \
-                 and current_filename[9:].isdigit():
-                snap_index_str = current_filename[9:]
-                snap_index = int(snap_index_str) + 1
-                snap_index_str = str(snap_index)
-                current_snap_str = 'disk_snap' + snap_index_str;
-                new_file = os.path.join(os.path.dirname(current_file), current_snap_str)
+
+            if len(current_filename) >= 4 and current_filename[0:4] == 'disk' \
+                and ((current_filename[4:].isdigit()) or current_filename[4:] == ''):
+                new_filename = 'disk' + str(snapshot_index)
+                new_file_path = os.path.join(os.path.dirname(current_file), new_filename)
+                disks_to_snap.append((current_file, new_file_path))
             else:
                 msg = _('Unknown disk name for instance. Cannot light snapshot this disk.')
                 raise exception.NovaException(msg)
-
-            # Determine path for new_file based on current path
-            if disk_info['current_file'] is not None:
-                current_file = disk_info['current_file']
-                new_file_path = os.path.join(os.path.dirname(current_file),
-                                             new_file)
-                disks_to_snap.append((current_file, new_file_path))
 
         if not disks_to_snap:
             msg = _('Found no disk to create external snapshot.')
@@ -1833,10 +1830,13 @@ class LibvirtDriver(driver.ComputeDriver):
             snap_disk.snapshot = 'external'
             snap_disk.driver_name = 'qcow2'
 
-            if os.path.exists(new_filename):
-                utils.execute('rm', '-rf', new_filename)
+            # Since the index of snapshot is unique, the filename
+            # cannot be same.
+            #if os.path.exists(new_filename):
+            #    utils.execute('rm', '-rf', new_filename)
 
             snapshot.add_disk(snap_disk)
+
 
         snapshot_xml = snapshot.to_xml()
         LOG.debug("snap xml: %s", snapshot_xml, instance=instance)
@@ -1853,6 +1853,8 @@ class LibvirtDriver(driver.ComputeDriver):
 
             raise
 
+        instance.snapshot_index = snapshot_index
+        instance.save()
         for current_name, new_filename in disks_to_snap:
             utils.execute('chmod', '644', new_filename, run_as_root=True)
 
