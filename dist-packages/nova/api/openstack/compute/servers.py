@@ -1114,11 +1114,13 @@ class ServersController(wsgi.Controller):
     @extensions.expected_errors((400, 403, 404, 409))
     @wsgi.action('createSnapshot')
     def _light_snapshot_instance(self, req, id, body):
-        """take a external snapshot for an instance."""
+        """take a external snapshot for an instance.
+           then commit the last snapshot to the root disk.
+        """
         context = req.environ['nova.context']
         instance = self._get_instance(context, id)
         authorize(context, instance, 'create_snapshot')
-        LOG.debug('create external snapshot for instance', instance=instance)
+        LOG.debug('create light snapshot for instance', instance=instance)
         try:
             self.compute_api.light_snapshot(context, instance)
         except exception.InstanceNotReady as e:
@@ -1127,7 +1129,7 @@ class ServersController(wsgi.Controller):
             raise exc.HTTPNotFound(explanation=e.format_message())
         except exception.InstanceInvalidState as state_error:
             common.raise_http_conflict_for_instance_invalid_state(state_error,
-                'create external snapshot', id)
+                'create light snapshot', id)
         except exception.Invalid as err:
             raise exc.HTTPBadRequest(explanation=err.format_message())
 
