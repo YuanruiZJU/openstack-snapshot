@@ -2049,8 +2049,21 @@ class LibvirtDriver(driver.ComputeDriver):
         disk_path_del.append(disk_path)
 
         commit_top = disk_path
-        if commit_all:
+        if commit_all or (state != power_state.RUNNING and state != power_state.PAUSED):
             commit_top = current_disk_path
+
+
+        # we will get the index of snapshot which will
+        # commit to the root disk.
+        top_filename = commit_top.split['/'][-1]
+ 
+        root_index = None
+        if len(top_filename) >= 4 and top_filename[0:4] == 'disk' \
+            and (top_filename[4:].isdigit()):
+            root_index = int(top_filename[4:])
+        else:
+            msg = _('Unknown disk name for instance. Cannot commit disk.')
+            raise exception.NovaException(msg)
 
         # If the domain is active, we use libvirt's API to commit the 
         # last snapshot
@@ -2098,6 +2111,9 @@ class LibvirtDriver(driver.ComputeDriver):
                               instance=instance)
                     time.sleep(0.5)
 
+                instance.root_index = root_index
+                instance.save()
+
                 if commit_all == False:
                     try:
                         dev.abort_job(pivot=True)
@@ -2127,6 +2143,9 @@ class LibvirtDriver(driver.ComputeDriver):
             # mode for other users.
 
             self._disk_commit(current_disk_path, commit_base)
+
+            instance.root_index = root_index
+            instance.save()
 
             for path in disk_path_del:
                 utils.execute('rm', '-rf', path, delay_on_retry=True,
