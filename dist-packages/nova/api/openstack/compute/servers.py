@@ -1066,15 +1066,11 @@ class ServersController(wsgi.Controller):
         authorize(context, instance, 'enable_daily_snapshot')
         LOG.debug('enable daily snapshot.', instance=instance)
 
-        if instance.snapshot_daily:
-            return
-
-        if instance.light_snapshot_enable:
-            instance.snapshot_daily = True
-            instance.save()
-        else:
-            msg = _('The instance has not enabled light-snapshot.')
-            raise webob.exc.HTTPConflict(explanation=e.format_message()) 
+        entity = body["dailySnapshot"]
+        enable = entity["enable"]
+ 
+        instance.snapshot_daily = enable
+        instance.save()
 
 
 
