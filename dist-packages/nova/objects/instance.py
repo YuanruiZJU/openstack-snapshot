@@ -183,10 +183,10 @@ class _BaseInstance(base.NovaPersistentObject, base.NovaObject,
         # Added by YuanruiFan. We add this column to notify that the instance 
         # uses our light_snapshot_system
         'light_snapshot_enable': fields.BooleanField(default=False),
-        'snapshot_committed': fields.BooleanField(default=False)
-        'snapshot_index': fields.IntegerField(nullable=True)
-        'root_index': fields.IntegerField(nullable=True)
-        'snapshot_store': fields.BooleanField(default=False)
+        'snapshot_committed': fields.BooleanField(default=False),
+        'snapshot_index': fields.IntegerField(nullable=True),
+        'root_index': fields.IntegerField(nullable=True),
+        'snapshot_store': fields.BooleanField(default=False),
         'snapshot_daily': fields.BooleanField(default=False)
         }
 
