@@ -249,7 +249,6 @@ class ToggleEnableLightSnapshot(tables.BatchAction):
 # Added by YuanruiFan. Add a button for light-snapshot
 class LightSnapshotInstance(policy.PolicyTargetMixin, tables.BatchAction):
     name = "light_snapshot"
-    classes = ('ajax-modal', 'btn-light-snapshot')
     policy_rules = (("compute", "compute:light_snapshot"),)
     help_text = _("light-snapshot will save your data as snapshot.")
 
