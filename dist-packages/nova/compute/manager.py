@@ -3324,7 +3324,7 @@ class ComputeManager(manager.Manager):
         
     # Added by YuanruiFan. To snapshot all the instance in the host.
     @wrap_exception()
-    def light_snapshot_all(self, context):
+    def light_snapshot_all(self, context, daily=False):
         """With light-snapshot system, you can snapshot an instance without so 
            much time. So users may want to snapshot all the instances when few people
            are using instances. So that the state of all the instances can be stored.
@@ -3343,6 +3343,8 @@ class ComputeManager(manager.Manager):
                 if instance.power_state != power_state.RUNNING:
                     continue
 
+                if daily and (not instance.snapshot_daily):
+                    continue
                 # For all the instance that to snapshot, first update their task_state
                 if (CONF.light_snapshot_enabled and instance.light_snapshot_enable and (not instance.snapshot_committed)):
                     instance.task_state = snapshot_task_states.VM_SNAPSHOT_PENDING
