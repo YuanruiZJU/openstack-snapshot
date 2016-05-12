@@ -1141,8 +1141,9 @@ class ServerManager(base.BootingManagerWithFind):
         """
         self._action('disableSnapshot', server, None)
 
-    def light_snapshot_all(self):
-        self._action('snapshotAll', None, None)
+    def light_snapshot_all(self, daily):
+        body={'daily':daily}
+        self._action('snapshotAll', None, body)
 
     def backup(self, server, backup_name, backup_type, rotation):
         """

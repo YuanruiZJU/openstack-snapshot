@@ -1873,8 +1873,15 @@ def do_disable_light_snapshot(cs, args):
 
 # Added by YuanruiFan. We light snapshot all the instances that
 # enable light-snapshot system.
+@cliutils.arg(
+    '--daily',
+    dest='daily',
+    action="store_true",
+    default=False,
+    help=_('light-snapshot instance that enable_daily_snapshot.'))
 def do_light_snapshot_all(cs, args):
-    cs.servers.light_snapshot_all()
+    daily = args.daily
+    cs.servers.light_snapshot_all(daily)
 
 
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
