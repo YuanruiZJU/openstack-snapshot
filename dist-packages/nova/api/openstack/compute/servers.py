@@ -1089,9 +1089,9 @@ class ServersController(wsgi.Controller):
         instance.snapshot_store = enable
         instance.save()
 
-        if not enable:
+        if not instance.light_snapshot_enable:
             return
-        elif (instance.root_index is None):
+        if not enable:
             return
         else:
             try:

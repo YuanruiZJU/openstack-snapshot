@@ -34,3 +34,5 @@ VM_RECOVER_FROM_SNAPSHOT = "recovering"
 
 DISABLE_SNAPSHOT = "disabling_light_snapshot"
 ENABLE_SNAPSHOT = "enabling_light_snapshot"
+
+ENABLE_STORE = "enabling_store_snapshot"

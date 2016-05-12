@@ -3067,6 +3067,9 @@ class ComputeManager(manager.Manager):
             instance.snapshot_committed = False
             instance.save()
 
+            if instance.snapshot_store:
+                self.driver.store_snapshot_init(context, instance)
+
             instance.task_state = None
             instance.save(expected_task_state=snapshot_task_states.ENABLE_SNAPSHOT)
 
@@ -3079,6 +3082,49 @@ class ComputeManager(manager.Manager):
             msg = 'Instance disappeared during enabling light-snapshot system for instance'
             LOG.debug(msg, instance=instance)
 
+    # Added by YuanruiFan. To Initialize storing snashots of instance.
+    @wrap_exception()
+    @reverts_task_state
+    @wrap_instance_fault
+    def store_snapshot_init(self, context, instance):
+        try:
+            instance.task_state = snapshot_task_states.ENABLE_STORE
+            instance.save(expected_task_state=[None])
+
+        except exception.InstanceNotFound:
+            # possibility instance no longer exists, no point in continuing
+            LOG.debug("Instance not found, could not set state %s "
+                      "for instance.",
+                      snapshot_task_states.ENABLE_STORE, instance=instance)
+            return
+
+        except exception.UnexpectedDeletingTaskStateError:
+            LOG.debug("Instance being deleted, initializing storing snapshots cannot continue",
+                      instance=instance)
+            return
+
+
+        try:
+            LOG.info(_LI('Initialize storing snapshots for instance'), context=context,
+                  instance=instance)
+
+            self._notify_about_instance_usage(
+                context, instance, "store_snapshot_init.start")
+
+
+            self.driver.store_snapshot_init(context, instance)
+
+            instance.task_state = None
+            instance.save(expected_task_state=snapshot_task_states.ENABLE_STORE)
+
+            self._notify_about_instance_usage(context, instance,
+                                              "store_snapshot_init.end")
+        except (exception.InstanceNotFound,
+                exception.UnexpectedDeletingTaskStateError):
+            # the instance got deleted during the snapshot
+            # Quickly bail out of here
+            msg = 'Instance disappeared during initializing store snapshot for instance'
+            LOG.debug(msg, instance=instance)
  
         
 
