@@ -1650,12 +1650,49 @@ class LibvirtDriver(driver.ComputeDriver):
 
     # Added by YuanruiFan. When user has created an instance, we call this function
     # to create two external snapshot for initialization
-    def light_snapshot_init(self, context, instance):
-        """Create two external snapshot while the VM is running.
+    def store_snapshot_init(self, context, instance):
+        """Store snapshot initialization.
 
            :param instance: VM instance object reference.
         """
-        LOG.debug("while creating VM, create two light snapshots for VM.", instance = instance)
+        try:
+            # First, Get the instance path and make 'snapshots' directory.
+            # If 'snapshots' directory exists, ignore it.
+            instance_path = libvirt_utils.get_instance_path(instance)
+
+            snapdir_path = os.path.join(instance_path, 'snapshots')
+            disk_path = os.path.join(instance_path, 'disk')
+            snapdisk_path = os.path.join(snapdir_path, 'disk')
+           
+            fileutils.ensure_tree(snapdir_path) 
+            if instance.root_index == None:
+                libvirt_utils.copy_image(disk_path, snapdisk_path)
+                utils.execute('qemu-img', 'rebase', '-f', 'qcow2', '-u', snapdisk_path)
+            else:
+                root_index = instance.root_index
+                root_snap_name = 'disk' + str(root_index)
+                root_snap_path = os.path.join(snapdir_path, root_snap_name)
+                if not os.path.exists(root_snap_path):
+                    libvirt_utils.copy_image(disk_path, root_snap_path)
+                    utils.execute('qemu-img', 'rebase', '-f', 'qcow2', '-u', root_snap_path) 
+                        
+        except Exception:
+            with excutils.save_and_reraise_exception():
+                LOG.exception(_LE('Error occurred during '
+                                  'initializaing storing snapshot for instance.'),
+                              instance=instance)
+
+
+
+
+    # Added by YuanruiFan. When user has created an instance, we call this function
+    # to create two external snapshot for initialization
+    def light_snapshot_init(self, context, instance):
+        """Do initialization for light-snapshot instance.
+
+           :param instance: VM instance object reference.
+        """
+        LOG.debug(" create two light snapshots for VM.", instance = instance)
 
         try:
             guest = self._host.get_guest(instance)
@@ -2055,7 +2092,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
         # we will get the index of snapshot which will
         # commit to the root disk.
-        top_filename = commit_top.split['/'][-1]
+        top_filename = commit_top.split('/')[-1]
  
         root_index = None
         if len(top_filename) >= 4 and top_filename[0:4] == 'disk' \
