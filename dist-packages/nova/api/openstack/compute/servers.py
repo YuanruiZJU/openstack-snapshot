@@ -1254,11 +1254,13 @@ class ServersController(wsgi.Controller):
         authorize(context, action='light_snapshot_all')
         LOG.debug('Light snapshot all the instances that enable light-snapshot.')
  
+        entity = body['snapshotAll']
+        daily = entity['daily']
         host_api = compute.HostAPI() 
         compute_nodes = host_api.compute_node_get_all(context) 
         for node in compute_nodes:
             host = node.hypervisor_hostname
-            self.compute_api.light_snapshot_all(context, host)
+            self.compute_api.light_snapshot_all(context, host, daily=daily)
 
 
     @wsgi.response(202)

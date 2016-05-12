@@ -824,11 +824,11 @@ class ComputeAPI(object):
                    instance=instance)
 
 
-    def light_snapshot_all(self, ctxt, host):
+    def light_snapshot_all(self, ctxt, host, daily=False):
         version = '4.0'
         cctxt = self.client.prepare(server=_compute_host(host, None),
                 version=version)
-        cctxt.cast(ctxt, 'light_snapshot_all')
+        cctxt.cast(ctxt, 'light_snapshot_all', daily=daily)
 
     def snapshot_instance(self, ctxt, instance, image_id):
         version = '4.0'
