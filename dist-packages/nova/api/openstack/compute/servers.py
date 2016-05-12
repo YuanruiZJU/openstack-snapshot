@@ -1200,10 +1200,12 @@ class ServersController(wsgi.Controller):
 
         entity = body["recoverInstance"]
         use_root = entity["use_root"]
+        snap_index = entity["snap_index"]
 
         LOG.debug('recover the instance from its snapshot', instance=instance)
         try:
-            self.compute_api.light_recover(context, instance, use_root=use_root)
+            self.compute_api.light_recover(context, instance, 
+                                           use_root=use_root, snap_index=snap_index)
         except exception.InstanceNotReady as e:
             raise webob.exc.HTTPConflict(explanation=e.format_message())
         except exception.InstanceUnknownCell as e:

@@ -2315,7 +2315,7 @@ class API(base.Base):
     @check_instance_cell
     @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.STOPPED,
                                     vm_states.PAUSED, vm_states.SUSPENDED])
-    def light_recover(self, context, instance, use_root=False):
+    def light_recover(self, context, instance, use_root=False, snap_index=None):
         """Recover the instance from its snapshot.
 
         :param instance: nova.objects.instance.Instance object
@@ -2324,7 +2324,8 @@ class API(base.Base):
         instance.task_state = snapshot_task_states.VM_RECOVER_START
         instance.save(expected_task_state=[None])
 
-        self.compute_rpcapi.light_recover_instance(context, instance, use_root=use_root)
+        self.compute_rpcapi.light_recover_instance(context, instance, 
+                                                   use_root=use_root, snap_index=snap_index)
     
 
     # Added by YuanruiFan. Commit the snapshot to root disk of the instance.

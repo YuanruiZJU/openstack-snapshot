@@ -1807,10 +1807,17 @@ def do_light_snapshot(cs, args):
     action="store_true",
     default=False,
     help=_('use the root disk of instance to recover.'))
+@cliutils.arg(
+    '--snapshot-index', dest='index', metavar='<integer>', default=-1,
+    help=_('snapshot index that want to recover from. '
+           'Default -1 so that we recover from last snapshot.'))
 def do_recover(cs, args):
     use_root = args.use_root 
+    index = int(args.index)
+    if index == -1:
+        index = None
     server = _find_server(cs, args.server)
-    cs.servers.light_recover(server, use_root)
+    cs.servers.light_recover(server, use_root, index=index)
 
 # Added by YuanruiFan. Add a command line for commit the snapshot
 # of the instance.
