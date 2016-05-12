@@ -1890,6 +1890,17 @@ class LibvirtDriver(driver.ComputeDriver):
 
             raise
 
+        for current_filename, new_filename in disks_to_snap:
+            snap_file = os.path.join(os.path.dirname(current_filename), 'snapshot.log')
+            filename = current_filename.split('/')[-1]
+            ISOTIMEFORMAT='%Y-%m-%d %X'
+            fp = open(snap_file, 'a+')
+            fp.write(filename + "\t")
+            time_str = time.strftime(ISOTIMEFORMAT, time.localtime()) 
+            fp.write(time_str)
+            fp.write('\n')
+            fp.close()
+
         instance.snapshot_index = snapshot_index
         instance.save()
         for current_name, new_filename in disks_to_snap:
