@@ -1931,14 +1931,14 @@ class LibvirtDriver(driver.ComputeDriver):
     # Then launch the instance
     def _recover_instance(self, context, instance, domain, network_info, block_device_info, use_root=False):
         
+        # Get the current disk path of the instance and
+        # its backing file's path.
+        disk_path, source_format = libvirt_utils.find_disk(domain)
+        source_type = libvirt_utils.get_disk_type_from_path(disk_path)
+        src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
+                                                            format=source_format,
+                                                            basename=False)
         if not use_root:
-            # Get the current disk path of the instance and
-            # its backing file's path.
-            disk_path, source_format = libvirt_utils.find_disk(domain)
-            source_type = libvirt_utils.get_disk_type_from_path(disk_path)
-            src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
-                                                                format=source_format,
-                                                                basename=False)
 
             # Convert the system metadata to image metadata
             image_meta = objects.ImageMeta.from_instance(instance)
@@ -1959,13 +1959,16 @@ class LibvirtDriver(driver.ComputeDriver):
             # Power off the instance 
             self.power_off(instance)
 
-            # remove the original writable disk of the instance
-            # and create a new one with the same backing file
-            # and the same filename. 
-            src_disk_size = libvirt_utils.get_disk_size(disk_path,
-                                                    format=source_format)
-
-            utils.execute('rm', '-rf', disk_path)
+            if not instance.snapshot_store:
+                utils.execute('rm', '-rf', disk_path)
+            else:
+                snapdir_path = os.path.join(os.path.dirname(disk_path), 'snapshots')
+                back_filename = src_back_path.split('/')[-1]
+                snap_back_path = os.path.join(snapdir_path, back_filename)
+                utils.execute('ln', src_back_path, snap_back_path)
+                utils.execute('qemu-img', 'rebase', '-f', 'qcow2', '-u',
+                              '-b', snap_back_path, disk_path, run_as_root=True)
+                utils.execute('mv', disk_path, snapdir_path)
 
             # Finally launch the instance.
             self._create_domain(xml=xml) 
@@ -1989,6 +1992,8 @@ class LibvirtDriver(driver.ComputeDriver):
             instance.light_snapshot_enable = True
             instance.snapshot_committed = True
             instance.save()
+            disk_path_del = [disk_path, src_back_path]
+            self.post_commit(context, instance, disk_path_del, True)
             self._hard_reboot(context, instance, network_info, 
                               block_device_info=block_device_info)
 
