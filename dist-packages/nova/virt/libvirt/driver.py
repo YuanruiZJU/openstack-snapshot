@@ -2102,6 +2102,11 @@ class LibvirtDriver(driver.ComputeDriver):
             msg = _('Unknown disk name for instance. Cannot commit disk.')
             raise exception.NovaException(msg)
 
+        # Get snapshots dir for instance.
+        if instance.snapshot_store:
+            snapdir_path = os.path.join(os.path.dirname(disk_path), 'snapshots') 
+            fileutils.ensure_tree(snapdir_path)
+
         # If the domain is active, we use libvirt's API to commit the 
         # last snapshot
         if state == power_state.RUNNING or state == power_state.PAUSED:
@@ -2156,7 +2161,16 @@ class LibvirtDriver(driver.ComputeDriver):
                         dev.abort_job(pivot=True)
                     except Exception:
                         pass
-                    utils.execute('rm', '-rf', commit_top)
+                    if not instance.snapshot_store:
+                        utils.execute('rm', '-rf', commit_top)
+                    else:
+                        if instance.root_index == 0:
+                            base_path = os.path.join(snapdir_path, 'disk')
+                        else:
+                            base_path = os.path.join(snapdir_path, 'disk'+str(instance.root_index))
+                        utils.execute('qemu-img', 'rebase', '-f', 'qcow2', 
+                                      '-b', base_path, commit_top, run_as_root=True)
+                        utils.execute('mv', commit_top, snapdir_path) 
                 else:
                     count = 0
                     while count < retry_count:
