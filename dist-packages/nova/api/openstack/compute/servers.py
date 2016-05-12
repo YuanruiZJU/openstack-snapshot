@@ -1060,7 +1060,7 @@ class ServersController(wsgi.Controller):
     @extensions.expected_errors((400, 403, 404, 409))
     @wsgi.action('dailySnapshot')
     def _enable_daily_snapshot(self, req, id, body):
-        """Enable daily light-snapshot for an instance."""
+        """Enable or Disable daily light-snapshot for an instance."""
         context = req.environ['nova.context']
         instance = self._get_instance(context, id)
         authorize(context, instance, 'enable_daily_snapshot')
@@ -1071,6 +1071,41 @@ class ServersController(wsgi.Controller):
  
         instance.snapshot_daily = enable
         instance.save()
+
+    # Added by YuanruiFan. To enable or disable storing snapshot for an instance.
+    @wsgi.response(202)
+    @extensions.expected_errors((400, 403, 404, 409))
+    @wsgi.action('storeSnapshot')
+    def _enable_store_snapshot(self, req, id, body):
+        """Enable or Disable light-snapshot for an instance."""
+        context = req.environ['nova.context']
+        instance = self._get_instance(context, id)
+        authorize(context, instance, 'enable_store_snapshot')
+        LOG.debug('enable or disable store snapshot.', instance=instance)
+
+        entity = body["storeSnapshot"]
+        enable = entity["enable"]
+
+        instance.snapshot_store = enable
+        instance.save()
+
+        if not enable:
+            return
+        elif (instance.root_index is None):
+            return
+        else:
+            try:
+                self.compute_api.store_snapshot_init(context, instance)
+            except exception.InstanceNotReady as e:
+                raise webob.exc.HTTPConflict(explanation=e.format_message())
+            except exception.InstanceUnknownCell as e:
+                raise exc.HTTPNotFound(explanation=e.format_message())
+            except exception.InstanceInvalidState as state_error:
+                common.raise_http_conflict_for_instance_invalid_state(state_error,
+                    'enable storing snapshot for instance', id)
+            except exception.Invalid as err:
+                raise exc.HTTPBadRequest(explanation=err.format_message())
+
 
 
 

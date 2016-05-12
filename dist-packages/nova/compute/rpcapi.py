@@ -808,6 +808,14 @@ class ComputeAPI(object):
         cctxt.cast(ctxt, 'enable_light_snapshot',
                    instance=instance)
 
+    def store_snapshot_init(self, ctxt, instance):
+        version = '4.0'
+        cctxt = self.client.prepare(server=_compute_host(None, instance),
+                version=version)
+        cctxt.cast(ctxt, 'store_snapshot_init',
+                   instance=instance)
+
+
     def disable_snapshot_instance(self, ctxt, instance):
         version = '4.0'
         cctxt = self.client.prepare(server=_compute_host(None, instance),

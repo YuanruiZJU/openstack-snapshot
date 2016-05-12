@@ -1120,11 +1120,18 @@ class ServerManager(base.BootingManagerWithFind):
         self._action('enableSnapshot', server, None)
 
     def enable_daily_snapshot(self, server, enable=True):
-        """ Enable daily light-snapshot for a server.
+        """ Enable or Disable daily light-snapshot for a server.
         : param server: The :class: `Server` (or its ID) to share onto
         """
         body = {'enable': enable}
         self._action('dailySnapshot', server, body)
+
+    def enable_store_snapshot(self, server, enable=True):
+        """ Enable or Disable storing light-snapshot for a server.
+        : param server: The :class: `Server` (or its ID) to share onto
+        """
+        body = {'enable': enable}
+        self._action('storeSnapshot', server, body)
 
 
     def disable_light_snapshot(self, server):

@@ -1834,6 +1834,21 @@ def do_enable_daily_snapshot(cs, args):
     server = _find_server(cs, args.server)
     cs.servers.enable_daily_snapshot(server, True)
 
+# Added by YuanruiFan. Add a command line for enable storing snapshots
+# for the instance
+@cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
+def do_enable_store_snapshot(cs, args):
+    server = _find_server(cs, args.server)
+    cs.servers.enable_store_snapshot(server, True)
+
+# Added by YuanruiFan. Add a command line for disable storing snapshots
+# for the instance
+@cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
+def do_disable_store_snapshot(cs, args):
+    server = _find_server(cs, args.server)
+    cs.servers.enable_store_snapshot(server, False)
+
+
 # Added by YuanruiFan. Add a command line for disable daily snapshot
 # for the instance
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))

@@ -2250,6 +2250,20 @@ class API(base.Base):
 
         self.compute_rpcapi.enable_snapshot_instance(context, instance)
 
+    @wrap_check_policy
+    @check_instance_host
+    @check_instance_cell
+    @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.STOPPED,
+                                    vm_states.PAUSED, vm_states.SUSPENDED])
+    def store_snapshot_init(self, context, instance):
+        """Initialize store-snapshot system from instance.
+
+        :param instance: nova.objects.instance.Instance object
+        """
+
+        self.compute_rpcapi.store_snapshot_init(context, instance)
+
+
 
     @wrap_check_policy
     @check_instance_host
