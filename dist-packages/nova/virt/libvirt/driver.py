@@ -2068,10 +2068,11 @@ class LibvirtDriver(driver.ComputeDriver):
         src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
                                                             format=source_format,
                                                             basename=False)
-
+        # BlockAbortJob may fail, we just retry. 
         retry_count = 5
-        state = guest.get_power_state(self._host)
 
+
+        # Get the snapshot based on root disk of instance.
         current_disk_path = disk_path
         disk_path_del = []
         commit_base = os.path.join(os.path.dirname(disk_path), 'disk')       
@@ -2081,10 +2082,10 @@ class LibvirtDriver(driver.ComputeDriver):
             src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
                                                                 format=source_format,
                                                                 basename=False) 
-        # All the disk except root disk will be removed
-        # after all the snapshots are committed to root disk
         disk_path_del.append(disk_path)
 
+        # Get the top block device path to commit
+        state = guest.get_power_state(self._host)
         commit_top = disk_path
         if commit_all or (state != power_state.RUNNING and state != power_state.PAUSED):
             commit_top = current_disk_path
@@ -2092,9 +2093,8 @@ class LibvirtDriver(driver.ComputeDriver):
 
         # we will get the index of snapshot which will
         # commit to the root disk.
-        top_filename = commit_top.split('/')[-1]
- 
         root_index = None
+        top_filename = commit_top.split('/')[-1]
         if len(top_filename) >= 4 and top_filename[0:4] == 'disk' \
             and (top_filename[4:].isdigit()):
             root_index = int(top_filename[4:])
@@ -2102,10 +2102,6 @@ class LibvirtDriver(driver.ComputeDriver):
             msg = _('Unknown disk name for instance. Cannot commit disk.')
             raise exception.NovaException(msg)
 
-        # Get snapshots dir for instance.
-        if instance.snapshot_store:
-            snapdir_path = os.path.join(os.path.dirname(disk_path), 'snapshots') 
-            fileutils.ensure_tree(snapdir_path)
 
         # If the domain is active, we use libvirt's API to commit the 
         # last snapshot
@@ -2153,37 +2149,30 @@ class LibvirtDriver(driver.ComputeDriver):
                               instance=instance)
                     time.sleep(0.5)
 
-                instance.root_index = root_index
-                instance.save()
 
                 if commit_all == False:
                     try:
                         dev.abort_job(pivot=True)
                     except Exception:
                         pass
-                    if not instance.snapshot_store:
-                        utils.execute('rm', '-rf', commit_top)
-                    else:
-                        if instance.root_index == 0:
-                            base_path = os.path.join(snapdir_path, 'disk')
-                        else:
-                            base_path = os.path.join(snapdir_path, 'disk'+str(instance.root_index))
-                        utils.execute('qemu-img', 'rebase', '-f', 'qcow2', 
-                                      '-b', base_path, commit_top, run_as_root=True)
-                        utils.execute('mv', commit_top, snapdir_path) 
+                    disk_path_del=[commit_top]
                 else:
                     count = 0
                     while count < retry_count:
                         try:
                             dev.abort_job(pivot=True)
-                            for path in disk_path_del:
-                                utils.execute('rm', '-rf', path)
                             instance.snapshot_committed = True
                             instance.save()
                             break
                         except Exception:
                             count += 1
                             time.sleep(0.5)
+
+                # After commit, delete or move original snapshot. 
+                self.post_commit(context, instance, disk_path_del, commit_all)
+
+                instance.root_index = root_index
+                instance.save()
 
         else:
             LOG.info(_LI("commit snapshot for instance that is not active."),
@@ -2193,15 +2182,11 @@ class LibvirtDriver(driver.ComputeDriver):
             # the contents of snapshot to the root disk but the files must have 'w'
             # mode for other users.
 
-            self._disk_commit(current_disk_path, commit_base)
+            self._disk_commit(commit_top, commit_base)
 
+            self.post_commit(context, instance, disk_path_del, True)
             instance.root_index = root_index
-            instance.save()
 
-            for path in disk_path_del:
-                utils.execute('rm', '-rf', path, delay_on_retry=True,
-                          attempts=5)
-            
             # After all snapshots committed, update the snaphsot state
             instance.snapshot_committed = True
             instance.save()
@@ -2209,7 +2194,54 @@ class LibvirtDriver(driver.ComputeDriver):
             LOG.info(_LI("commit snapshot successfully for instance that is not active."),
                          instance=instance)
 
-
+    # Added by YuanruiFan. When commit ends, do post_commit
+    def post_commit(self, context, instance, disk_path_del, commit_all):
+        
+        if not instance.snapshot_store:
+            for path in disk_path_del:
+                utils.execute('rm', '-rf', path)
+        else:
+            # Get snapshots dir for instance.
+            instance_path = libvirt_utils.get_instance_path(instance)
+            if instance.snapshot_store:
+                snapdir_path = os.path.join(instance_path, 'snapshots') 
+                if not os.path.exists(snapdir_path):
+                    msg = _('The snapshots directory of the instance has not been made.')
+                    raise exception.NovaException(msg)
+        
+                else:
+                    disk_path = os.path.join(snapdir_path, 'disk')
+                    path = disk_path_del.pop()
+                    filename = path.split('/')[-1]
+                    snap_disk_path = os.path.join(snapdir_path, filename)
+                    if instance.root_index is None:
+                        if not os.path.exists(disk_path):
+                            msg = _("The base path of snapshot does not exist.")
+                            raise exception.NovaException(msg)
+                        utils.execute('qemu-img', 'rebase', '-f', 'qcow2','-u',
+                                      '-b', disk_path, path, run_as_root=True) 
+                        utils.execute('mv', path, snap_disk_path)
+                    else:
+                        root_snap_path = os.path.join(snapdir_path, 'disk'+str(instance.root_index))
+                        if not os.path.exists(root_snap_path):
+                            msg = _("The base path of snapshot does not exist.") 
+                            raise exception.NovaException(msg)
+                        utils.execute('qemu-img', 'rebase', '-f', 'qcow2', '-u',
+                                      '-b', root_snap_path, path, run_as_root=True)
+                        utils.execute('mv', path, snap_disk_path)
+           
+                    if commit_all:
+                        i = disk_path_del.__len__() - 1 
+                        while i >= 0 :
+                            path = disk_path_del[i]
+                            filename = path.split('/')[-1]
+                            base_path = snap_disk_path
+                            snap_disk_path = os.path.join(snapdir_path, filename)
+                            utils.execute('qemu-img', 'rebase', '-f', 'qcow2', '-u',
+                                          '-b', base_path, path, run_as_root=True)
+                            utils.execute('mv', path, snap_disk_path)                            
+                            i -= 1
+ 
 
 
     # Added by Yuanrui Fan. This function is used to commonly commit from top 
