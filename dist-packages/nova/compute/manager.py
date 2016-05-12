@@ -3262,7 +3262,7 @@ class ComputeManager(manager.Manager):
     @wrap_exception()
     @reverts_task_state
     @wrap_instance_fault
-    def light_recover_instance(self, context, instance, use_root=False):
+    def light_recover_instance(self, context, instance, use_root=False, snap_index=None):
         """ If vm is down unexpectively and data is lost, we can use
         this function to recover the vm."""
         try:
@@ -3282,11 +3282,12 @@ class ComputeManager(manager.Manager):
             return
 
         self._light_recover_instance(context, instance, snapshot_task_states.VM_RECOVER_FROM_SNAPSHOT,
-                                     use_root=use_root)
+                                     use_root=use_root, snap_index=snap_index)
 
 
     #Added by YuanruiFan. To recover the vm from its last external snapshot
-    def _light_recover_instance(self, context, instance, expected_task_state, use_root=False):
+    def _light_recover_instance(self, context, instance, expected_task_state, 
+                                use_root=False, snap_index=None):
         context = context.elevated()
 
         try:
@@ -3305,10 +3306,12 @@ class ComputeManager(manager.Manager):
 
 
             self.driver.recover_instance_from_snapshot(context, instance,network_info,block_device_info,
-                                                       use_root=use_root)
+                                                       use_root=use_root, snap_index=snap_index)
 
+            instance.power_state = self._get_power_state(context, instance)
+            instance.vm_state = vm_states.ACTIVE
             instance.task_state = None
-            instance.save(expected_task_state=snapshot_task_states.VM_RECOVER_FROM_SNAPSHOT)
+            instance.save(expected_task_state=expected_task_state)
 
             self._notify_about_instance_usage(context, instance,
                                               "recover_instance.end")

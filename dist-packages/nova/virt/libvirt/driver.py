@@ -1909,7 +1909,8 @@ class LibvirtDriver(driver.ComputeDriver):
 
     # Added by Yuanrui Fan. This function is used to recover the instance from
     # its snapshot.
-    def recover_instance_from_snapshot(self, context, instance, network_info, block_device_info, use_root=False):
+    def recover_instance_from_snapshot(self, context, instance, network_info, block_device_info, 
+                                       use_root=False, snap_index=None):
         """recover the instance from its last snapshot
  
           :param instance: instance object reference
@@ -1929,7 +1930,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
         try:
             self._recover_instance(context, instance, virt_dom, network_info, block_device_info,
-                                   use_root=use_root)
+                                   use_root=use_root, snap_index=snap_index)
 
         except Exception:
             with excutils.save_and_reraise_exception():
@@ -1940,7 +1941,8 @@ class LibvirtDriver(driver.ComputeDriver):
     # Added by YuanruiFan. This function will first poweroff the instance
     # and create a new image based on the snapshot of the instance and
     # Then launch the instance
-    def _recover_instance(self, context, instance, domain, network_info, block_device_info, use_root=False):
+    def _recover_instance(self, context, instance, domain, network_info, block_device_info, 
+                          use_root=False, snap_index=None):
         
         # Get the current disk path of the instance and
         # its backing file's path.
@@ -1949,26 +1951,39 @@ class LibvirtDriver(driver.ComputeDriver):
         src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
                                                             format=source_format,
                                                             basename=False)
+        # Convert the system metadata to image metadata
+        image_meta = objects.ImageMeta.from_instance(instance)
+
+        instance_dir = libvirt_utils.get_instance_path(instance)
+        fileutils.ensure_tree(instance_dir)
+
+        disk_info = blockinfo.get_disk_info(CONF.libvirt.virt_type,
+                                            instance,
+                                            image_meta,
+                                            block_device_info)
+
+        xml = self._get_guest_xml_disk(context,instance,network_info, disk_info,
+                                       image_meta, src_back_path, 
+                                       block_device_info=block_device_info,
+                                       write_to_disk=True) 
+
+
+        if snap_index is not None:
+            self.recover_from_snap_index(context, instance, snap_index)
+            instance.snapshot_committed = True 
+            instance.root_index = snap_index
+            instance.save()
+            disk_path_del = [disk_path, src_back_path]
+            self.post_commit(context, instance, disk_path_del, True)
+            self._hard_reboot(context, instance, network_info, 
+                              block_device_info=block_device_info)
+            
+
+            return
+
+        # Power off the instance 
+        self.power_off(instance)
         if not use_root:
-
-            # Convert the system metadata to image metadata
-            image_meta = objects.ImageMeta.from_instance(instance)
-
-            instance_dir = libvirt_utils.get_instance_path(instance)
-            fileutils.ensure_tree(instance_dir)
-
-            disk_info = blockinfo.get_disk_info(CONF.libvirt.virt_type,
-                                                instance,
-                                                image_meta,
-                                                block_device_info)
-
-            xml = self._get_guest_xml_disk(context,instance,network_info, disk_info,
-                                           image_meta, src_back_path, 
-                                           block_device_info=block_device_info,
-                                           write_to_disk=True) 
- 
-            # Power off the instance 
-            self.power_off(instance)
 
             if not instance.snapshot_store:
                 utils.execute('rm', '-rf', disk_path)
@@ -1976,7 +1991,8 @@ class LibvirtDriver(driver.ComputeDriver):
                 snapdir_path = os.path.join(os.path.dirname(disk_path), 'snapshots')
                 back_filename = src_back_path.split('/')[-1]
                 snap_back_path = os.path.join(snapdir_path, back_filename)
-                utils.execute('ln', src_back_path, snap_back_path)
+                if not os.path.exists(snap_back_path):
+                    utils.execute('ln', src_back_path, snap_back_path)
                 utils.execute('qemu-img', 'rebase', '-f', 'qcow2', '-u',
                               '-b', snap_back_path, disk_path, run_as_root=True)
                 utils.execute('mv', disk_path, snapdir_path)
@@ -2008,6 +2024,42 @@ class LibvirtDriver(driver.ComputeDriver):
             self._hard_reboot(context, instance, network_info, 
                               block_device_info=block_device_info)
 
+    def recover_from_snap_index(self, context, instance, snap_index):
+        instance_path = libvirt_utils.get_instance_path(instance)
+
+        snapdir_path = os.path.join(instance_path, 'snapshots')
+        disk_path = os.path.join(instance_path, 'disk')
+        src_back_path = libvirt_utils.get_disk_backing_file(disk_path,
+                                                            basename=False)
+
+        recover_disk_path = os.path.join(snapdir_path, 'disk'+str(snap_index))
+
+        out_path = os.path.join(snapdir_path, 'recover_disk')
+        if not os.path.exists(recover_disk_path):
+            msg = _('cannot recover from a non-exist snapshot.')
+            raise exception.NovaException(msg)
+
+        
+        utils.execute('qemu-img', 'convert', '-f', 'qcow2', '-O', 'qcow2', 
+                      recover_disk_path, out_path)       
+
+        utils.execute('qemu-img', 'rebase', '-f', 'qcow2', '-u',
+                      '-b', src_back_path, out_path)
+        
+
+        self.power_off(instance)
+        if instance.snapshot_store:
+            root_index = instance.root_index
+            if root_index is None:
+                root_filename = 'disk'
+            else:
+                root_filename = 'disk' + str(root_index)
+            root_path = os.path.join(snapdir_path, root_filename)
+            if not os.path.exists(root_path):
+                utils.execute('mv', disk_path, root_path)
+        utils.execute('mv', out_path, disk_path)
+
+            
 
     # Added by YuanruiFan. This function is used to commit the snapshot of
     # the instance and then create another external snapshot so that the 
@@ -2188,6 +2240,9 @@ class LibvirtDriver(driver.ComputeDriver):
                 self.post_commit(context, instance, disk_path_del, commit_all)
 
                 instance.root_index = root_index
+                if commit_all:
+                    instance.root_index += 1
+                    instance.snapshot_index += 1 
                 instance.save()
 
         else:
@@ -2201,7 +2256,8 @@ class LibvirtDriver(driver.ComputeDriver):
             self._disk_commit(commit_top, commit_base)
 
             self.post_commit(context, instance, disk_path_del, True)
-            instance.root_index = root_index
+            instance.root_index = root_index + 1
+            instance.snapshot_index += 1
 
             # After all snapshots committed, update the snaphsot state
             instance.snapshot_committed = True
