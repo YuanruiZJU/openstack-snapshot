@@ -1124,6 +1124,14 @@ def get_light_snapshot_enabled(instance):
         light_snapshot_enabled = instance.light_snapshot_enabled
         if light_snapshot_enabled:
             ret_str = "enabled"
+            if hasattr(instance, "snapshot_daily"):
+                snapshot_daily = instance.snapshot_daily
+                if snapshot_daily :
+                    ret_str += ", daily"
+            if hasattr(instance, "snapshot_store"):
+                snapshot_store = instance.snapshot_store
+                if snapshot_store:
+                    ret_str += ", store"
         else:
             ret_str = "disabled"
     return ret_str    

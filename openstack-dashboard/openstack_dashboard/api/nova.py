@@ -95,7 +95,7 @@ class Server(base.APIResourceWrapper):
               'tenant_id', 'user_id', 'created', 
               # Added by YuanruiFan. So that dashboard can know whether
               # the instance enabled light-snapshot
-              'light_snapshot_enabled',
+              'light_snapshot_enabled','snapshot_daily','snapshot_store',
               'OS-EXT-STS:power_state',
               'OS-EXT-STS:task_state', 'OS-EXT-SRV-ATTR:instance_name',
               'OS-EXT-SRV-ATTR:host', 'OS-EXT-AZ:availability_zone',
