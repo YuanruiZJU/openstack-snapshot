@@ -1174,6 +1174,9 @@ class ServersController(wsgi.Controller):
         instance = self._get_instance(context, id)
         authorize(context, instance, 'create_snapshot')
         LOG.debug('create light snapshot for instance', instance=instance)
+
+        if not instance.light_snapshot_enable:
+            raise exc.HTTPBadRequest(explanation=_('The instance does not enable light-snapshot.'))
         try:
             self.compute_api.light_snapshot(context, instance)
         except exception.InstanceNotReady as e:
