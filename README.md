@@ -5,6 +5,7 @@
 使用时，用户首先按照官方文档，安装L版本的OpenStack。然后直接将文件的对应的路径覆盖即可，相关命令如下：
 ```
 # cp -r openstack-snapshot/dist-packages/* /usr/lib/python2.7/dist-packages/
+# cp -r openstack-snapshot/openstack-dashboard/* /usr/share/openstack-dashboard/
 ```
 
 * 为了正常使用light-snapshot系统的功能，需要修改数据库中相关表。
