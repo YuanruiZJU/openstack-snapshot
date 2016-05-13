@@ -185,13 +185,13 @@ class ToggleEnableLightSnapshot(tables.BatchAction):
     def action_present(count):
         return (
             ungettext_lazy(
-                u"Disable Light-snapshot",
-                u"Disable Light-snapshot",
+                u"Disable Light-Snapshot",
+                u"Disable Light-Snapshot",
                 count
             ),
             ungettext_lazy(
-                u"Enable Light-snapshot",
-                u"Enable Light-snapshot",
+                u"Enable Light-Snapshot",
+                u"Enable Light-Snapshot",
                 count
             ),
         )
@@ -200,13 +200,13 @@ class ToggleEnableLightSnapshot(tables.BatchAction):
     def action_past(count):
         return (
             ungettext_lazy(
-                u"Disable Light-snapshot for instance Successfully",
-                u"Disable Light-snapshot for instances Successfully",
+                u"Disable Light-Snapshot for instance Successfully",
+                u"Disable Light-Snapshot for instances Successfully",
                 count
             ),
             ungettext_lazy(
-                u"Enable Light-snapshot for instance Successfully",
-                u"Enable Light-snapshot for instances Successfully",
+                u"Enable Light_Snapshot for instance Successfully",
+                u"Enable Light_Snapshot for instances Successfully",
                 count
             ),
         )
