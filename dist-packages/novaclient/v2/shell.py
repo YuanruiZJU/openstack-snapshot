@@ -1819,14 +1819,6 @@ def do_recover(cs, args):
     server = _find_server(cs, args.server)
     cs.servers.light_recover(server, use_root, index=index)
 
-# Added by YuanruiFan. Add a command line for commit the snapshot
-# of the instance.
-@cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
-def do_commit_snapshot(cs, args):
-    server = _find_server(cs, args.server)
-    cs.servers.light_commit(server)
-
-
 # Added by YuanruiFan. Add a command line for enable snapshot-system
 # for the instance
 @cliutils.arg('server', metavar='<server>', help=_('Name or ID of server.'))
