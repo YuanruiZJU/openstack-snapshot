@@ -2241,8 +2241,8 @@ class LibvirtDriver(driver.ComputeDriver):
 
                 instance.root_index = root_index
                 if commit_all:
-                    instance.root_index += 1
                     instance.snapshot_index += 1 
+                    instance.root_index = instance.snapshot_index 
                 instance.save()
 
         else:
