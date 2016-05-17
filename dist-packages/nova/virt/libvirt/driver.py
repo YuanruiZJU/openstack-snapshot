@@ -7628,11 +7628,17 @@ class LibvirtDriver(driver.ComputeDriver):
                                              compression=compression)
 
             # Added by YuanruiFan. copy the light-snapshots directory if it exists.
-            snapshots_dir = os.path.join(inst_base_resize, "snapshots")
+            snapshots_dir = os.path.join(inst_base_resize, 'snapshots')
             if os.path.exists(snapshots_dir):
                 from_path = snapshots_dir
                 img_path = inst_base
                 libvirt_utils.copy_dir(from_path, img_path, host=dest)
+
+            snapshot_log_path = os.path.join(inst_base_resize, 'snapshot.log')
+            if os.path.exists(snapshot_log_path):
+                from_path = snapshot_log_path
+                img_path = inst_base
+                libvirt_utils.copy_dir(from_path, img_path, host=dest) 
              
         except Exception:
             with excutils.save_and_reraise_exception():
