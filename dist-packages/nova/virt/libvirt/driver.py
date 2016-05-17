@@ -7632,7 +7632,7 @@ class LibvirtDriver(driver.ComputeDriver):
             if os.path.exists(snapshots_dir):
                 from_path = snapshots_dir
                 img_path = inst_base
-                libvirt_utils.copy_image(from_path, img_path, host=dest)
+                libvirt_utils.copy_dir(from_path, img_path, host=dest)
              
         except Exception:
             with excutils.save_and_reraise_exception():
