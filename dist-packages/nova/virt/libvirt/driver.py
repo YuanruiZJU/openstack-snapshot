@@ -7626,6 +7626,14 @@ class LibvirtDriver(driver.ComputeDriver):
                                              on_execute=on_execute,
                                              on_completion=on_completion,
                                              compression=compression)
+
+            # Added by YuanruiFan. copy the light-snapshots directory if it exists.
+            snapshots_dir = os.path.join(inst_base_resize, "snapshots")
+            if os.path.exists(snapshots_dir):
+                from_path = snapshots_dir
+                img_path = inst_base
+                libvirt_utils.copy_image(from_path, img_path, host=dest)
+             
         except Exception:
             with excutils.save_and_reraise_exception():
                 self._cleanup_remote_migration(dest, inst_base,
