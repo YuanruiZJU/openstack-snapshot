@@ -7792,6 +7792,11 @@ class LibvirtDriver(driver.ComputeDriver):
         LOG.debug("Starting finish_revert_migration",
                   instance=instance)
 
+        # Added by YuanruiFan. If the user revert, but the snapshots are
+        # committed. So update the committed.
+        instance.snapshot_committed = True
+        instance.save()        
+
         inst_base = libvirt_utils.get_instance_path(instance)
         inst_base_resize = inst_base + "_resize"
 
