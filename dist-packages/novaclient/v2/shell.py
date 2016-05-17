@@ -1323,7 +1323,7 @@ def do_image_delete(cs, args):
 
 #Added by YuanruiFan. To show instances that use light-snapshot
 @cliutils.arg(
-    '--light_snapshot_enabled',
+    '--light-snapshot-enabled',
     dest='light_snapshot_enable',
     action="store_true",
     default=False,

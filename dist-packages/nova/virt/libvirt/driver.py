@@ -2116,6 +2116,9 @@ class LibvirtDriver(driver.ComputeDriver):
 
         # first commit the last snapshot
         self._commit_light_snapshot(context, instance, guest, virt_dom, commit_all=True)
+ 
+        instance.snapshot_committed = True
+        instance.save()
 
 
 
