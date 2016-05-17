@@ -5434,6 +5434,8 @@ class LibvirtDriver(driver.ComputeDriver):
             self.light_snapshot_init(context, instance)
             instance.snapshot_committed = False
             instance.save()
+            if instance.snapshot_store:
+                self.store_snapshot_init(context, instance)
 
         return guest
 
