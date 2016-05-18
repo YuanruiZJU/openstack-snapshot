@@ -1176,7 +1176,7 @@ class ServersController(wsgi.Controller):
         LOG.debug('create light snapshot for instance', instance=instance)
 
         if not instance.light_snapshot_enable:
-            raise exc.HTTPBadRequest(explanation=_('The instance does not enable light-snapshot.'))
+            raise exc.HTTPBadRequest(explanation=_('The instance does not enable light-snapshot, cannot snapshot instance.'))
         try:
             self.compute_api.light_snapshot(context, instance)
         except exception.InstanceNotReady as e:
@@ -1204,6 +1204,12 @@ class ServersController(wsgi.Controller):
         entity = body["recoverInstance"]
         use_root = entity["use_root"]
         snap_index = entity["snap_index"]
+
+        if not instance.light_snapshot_enable:
+            raise exc.HTTPBadRequest(explanation=_('The instance does not enable light-snapshot, cannot recover instance.'))
+
+        if (use_root == True) and (snap_index is not None):
+            raise exc.HTTPBadRequest(explanation=_('recover command cannot have both use-root and snapshot-index arguments.'))
 
         LOG.debug('recover the instance from its snapshot', instance=instance)
         try:

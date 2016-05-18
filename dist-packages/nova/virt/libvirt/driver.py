@@ -1992,7 +1992,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 back_filename = src_back_path.split('/')[-1]
                 snap_back_path = os.path.join(snapdir_path, back_filename)
                 if not os.path.exists(snap_back_path):
-                    utils.execute('ln', src_back_path, snap_back_path)
+                    utils.execute('cp', src_back_path, snap_back_path)
                 utils.execute('qemu-img', 'rebase', '-f', 'qcow2', '-u',
                               '-b', snap_back_path, disk_path, run_as_root=True)
                 utils.execute('mv', disk_path, snapdir_path)
