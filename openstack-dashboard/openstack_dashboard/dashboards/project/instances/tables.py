@@ -234,7 +234,6 @@ class ToggleEnableLightSnapshot(tables.BatchAction):
                 target={'project_id': getattr(instance, 'tenant_id', None)})
 
         return (has_permission
-                and (instance.status in ACTIVE_STATES or self.light_snapshot_enabled)
                 and not is_deleting(instance))
 
 
@@ -271,8 +270,7 @@ class RecoverInstance(policy.PolicyTargetMixin, tables.BatchAction):
 
     def allowed(self, request, instance=None):
         if instance is not None:
-            return ((instance.status in ACTIVE_STATES)
-                    and instance.light_snapshot_enabled
+            return (instance.light_snapshot_enabled
                     and not is_deleting(instance))
         else:
             return False
