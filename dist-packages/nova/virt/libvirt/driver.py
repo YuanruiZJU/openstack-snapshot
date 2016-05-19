@@ -1667,7 +1667,7 @@ class LibvirtDriver(driver.ComputeDriver):
             fileutils.ensure_tree(snapdir_path) 
             if instance.root_index == None:
                 libvirt_utils.copy_image(disk_path, snapdisk_path)
-                utils.execute('qemu-img', 'rebase', '-f', 'qcow2', '-u', snapdisk_path)
+                utils.execute('qemu-img', 'rebase', '-f', 'qcow2', '-u',snapdisk_path)
             else:
                 root_index = instance.root_index
                 root_snap_name = 'disk' + str(root_index)
@@ -1795,7 +1795,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
     # Added by YuanruiFan. This function will call the libvirt api for 
     # creating external snapshot for an instance
-    def _create_external_snapshot(self, context, instance, domain):
+    def _create_external_snapshot(self, context, instance, domain, write_log=True):
         """
            Create an external snapshot for an instance.
         
@@ -1890,16 +1890,17 @@ class LibvirtDriver(driver.ComputeDriver):
 
             raise
 
-        for current_filename, new_filename in disks_to_snap:
-            snap_file = os.path.join(os.path.dirname(current_filename), 'snapshot.log')
-            filename = current_filename.split('/')[-1]
-            ISOTIMEFORMAT='%Y-%m-%d %X'
-            fp = open(snap_file, 'a+')
-            fp.write(filename + "\t")
-            time_str = time.strftime(ISOTIMEFORMAT, time.localtime()) 
-            fp.write(time_str)
-            fp.write('\n')
-            fp.close()
+        if write_log:
+            for current_filename, new_filename in disks_to_snap:
+                snap_file = os.path.join(os.path.dirname(current_filename), 'snapshot.log')
+                filename = current_filename.split('/')[-1]
+                ISOTIMEFORMAT='%Y-%m-%d %X'
+                fp = open(snap_file, 'a+')
+                fp.write(filename + "\t")
+                time_str = time.strftime(ISOTIMEFORMAT, time.localtime()) 
+                fp.write(time_str)
+                fp.write('\n')
+                fp.close()
 
         instance.snapshot_index = snapshot_index
         instance.save()
@@ -2008,7 +2009,7 @@ class LibvirtDriver(driver.ComputeDriver):
                 raise exception.InstanceNotRunning(instance_id=instance.uuid)
 
             try:
-                self._create_external_snapshot(context, instance, virt_dom)
+                self._create_external_snapshot(context, instance, virt_dom, write_log=False)
             except Exception:
                 with excutils.save_and_reraise_exception():
                     LOG.exception(_LE('Error occurred during '
